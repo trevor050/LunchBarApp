@@ -114,23 +114,17 @@ struct LunchMenuView: View {
     @ObservedObject var viewModel: LunchViewModel
     @State private var expandedItemID: Int?
 
-    private var listHeight: CGFloat {
-        let baseHeight: CGFloat = 140
-        let available = LunchViewModel.fixedPopoverHeight - baseHeight
-        return max(0, available)
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            Divider()
-            content
-            Divider()
-            controls
+        GeometryReader { proxy in
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                content
+            }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
         }
         .frame(width: LunchViewModel.popoverWidth, height: LunchViewModel.fixedPopoverHeight)
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
     }
 
     private var header: some View {
@@ -142,35 +136,46 @@ struct LunchMenuView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .help("Quit LunchBarApp")
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(viewModel.displayedDate.formatted(.dateTime.weekday(.wide)))
                     .font(.headline)
                 Text(viewModel.displayedDate.formatted(.dateTime.month(.abbreviated).day()))
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            HStack(spacing: 8) {
+                controlButton(icon: "chevron.left", help: "Previous day") {
+                    viewModel.loadPrevious()
+                }
+                controlButton(icon: "arrow.clockwise", help: "Refresh") {
+                    viewModel.refresh()
+                }
+                controlButton(icon: "chevron.right", help: "Next day") {
+                    viewModel.loadNext()
+                }
+            }
         }
     }
 
     @ViewBuilder
     private var content: some View {
         if viewModel.isLoading {
-            HStack(spacing: 10) {
+            VStack(spacing: 10) {
                 ProgressView()
                 Text("Loading…")
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, maxHeight: listHeight, alignment: .center)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         } else if let error = viewModel.errorMessage {
             Text(error)
                 .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: listHeight, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(viewModel.items) { item in
                         VStack(alignment: .leading, spacing: 10) {
                             Button {
@@ -193,39 +198,29 @@ struct LunchMenuView: View {
                 // Smooth the expand/collapse of the nutrition card
                 .animation(.easeInOut(duration: 0.18), value: expandedItemID)
             }
-            .frame(maxHeight: listHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .scrollIndicators(.hidden)
         }
     }
 
-    private var controls: some View {
-        HStack {
-            Button {
-                viewModel.loadPrevious()
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .help("Previous day")
-
-            Spacer()
-
-            Button {
-                viewModel.refresh()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-            }
-            .help("Refresh")
-
-            Spacer()
-
-            Button {
-                viewModel.loadNext()
-            } label: {
-                Image(systemName: "chevron.right")
-            }
-            .help("Next day")
+    private func controlButton(icon: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 30, height: 30)
+                .foregroundStyle(.primary)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.primary.opacity(0.08))
+                )
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
+        .help(help)
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
@@ -478,6 +473,221 @@ final class LunchViewModel: ObservableObject {
     ]
     private func randomWeekendMessage() -> String { weekendMessages.randomElement() ?? weekendMessages.first! }
 
+    private func messageForNoLunch(on date: Date, weekdayFallback: String) -> String {
+        if let holidayGreeting = holidayMessage(for: date) {
+            return holidayGreeting
+        }
+        return calendar.isDateInWeekend(date) ? randomWeekendMessage() : weekdayFallback
+    }
+
+    private func holidayMessage(for date: Date) -> String? {
+        guard let year = calendar.dateComponents([.year], from: date).year else { return nil }
+
+        let easterSunday = easterDate(forYear: year)
+        let goodFriday = easterSunday.flatMap { calendar.date(byAdding: .day, value: -2, to: $0) }
+        let easterMonday = easterSunday.flatMap { calendar.date(byAdding: .day, value: 1, to: $0) }
+
+        let thanksgiving = nthWeekday(5, ordinal: 4, month: 11, year: year)
+        let thanksgivingEve = thanksgiving.flatMap { calendar.date(byAdding: .day, value: -1, to: $0) }
+        let dayAfterThanksgiving = thanksgiving.flatMap { calendar.date(byAdding: .day, value: 1, to: $0) }
+
+        let memorialDay = lastWeekday(2, month: 5, year: year)
+        let laborDay = nthWeekday(2, ordinal: 1, month: 9, year: year)
+        let indigenousPeoplesDay = nthWeekday(2, ordinal: 2, month: 10, year: year)
+        let patriotsDay = nthWeekday(2, ordinal: 3, month: 4, year: year)
+        let electionDay = electionDay(forYear: year)
+
+        let roshHashanah = hebrewHoliday(month: 1, day: 1, gregorianYear: year, occursInAutumn: true)
+        let yomKippur = hebrewHoliday(month: 1, day: 10, gregorianYear: year, occursInAutumn: true)
+        let passover = hebrewHoliday(month: 8, day: 15, gregorianYear: year, occursInAutumn: false)
+        let hanukkah = hebrewHoliday(month: 3, day: 25, gregorianYear: year, occursInAutumn: true)
+
+        let ramadanStart = islamicHoliday(month: 9, day: 1, gregorianYear: year)
+        let eidAlFitr = islamicHoliday(month: 10, day: 1, gregorianYear: year)
+        let eidAlAdha = islamicHoliday(month: 12, day: 10, gregorianYear: year)
+
+        let lunarNewYear = lunarNewYearDate(for: year)
+        let diwali = diwaliDate(for: year)
+
+        let orthodoxChristmas = fixedDate(month: 1, day: 7, year: year)
+
+        let matches: [(Date?, String)] = [
+            (fixedDate(month: 1, day: 1, year: year), "Happy New Year's Day! Enjoy the break."),
+            (observedDate(month: 1, day: 1, year: year), "New Year's Day observed—enjoy the extended holiday!"),
+            (orthodoxChristmas, "Merry Orthodox Christmas!"),
+            (nthWeekday(2, ordinal: 3, month: 1, year: year), "Honoring Dr. King today. Happy Martin Luther King Jr. Day!"),
+            (nthWeekday(2, ordinal: 3, month: 2, year: year), "Happy Presidents Day! School's out today."),
+            (lunarNewYear, "Happy Lunar New Year!"),
+            (patriotsDay, "Happy Patriots' Day! Enjoy the day off."),
+            (passover, "Chag Pesach Sameach! Enjoy Passover break."),
+            (roshHashanah, "Shanah Tovah! Happy Rosh Hashanah."),
+            (yomKippur, "Yom Kippur observance today—have an easy fast."),
+            (hanukkah, "Happy Hanukkah! Enjoy the Festival of Lights."),
+            (ramadanStart, "Ramadan Mubarak!"),
+            (eidAlFitr, "Eid al-Fitr Mubarak!"),
+            (eidAlAdha, "Eid al-Adha Mubarak!"),
+            (goodFriday, "Good Friday break—enjoy the long weekend!"),
+            (easterMonday, "Happy Easter Monday! See you back at school soon."),
+            (memorialDay, "Remember and honor—Happy Memorial Day!"),
+            (fixedDate(month: 6, day: 19, year: year), "Happy Juneteenth! Celebrate freedom today."),
+            (observedDate(month: 6, day: 19, year: year), "Juneteenth observed—enjoy the day off!"),
+            (fixedDate(month: 7, day: 4, year: year), "Happy Independence Day!"),
+            (observedDate(month: 7, day: 4, year: year), "Independence Day observed—enjoy the celebration!"),
+            (laborDay, "Happy Labor Day! Enjoy the extra rest."),
+            (indigenousPeoplesDay, "Indigenous Peoples' Day—school's out today."),
+            (diwali, "Happy Diwali! Enjoy the festival of lights."),
+            (fixedDate(month: 11, day: 11, year: year), "Honoring our heroes this Veterans Day."),
+            (observedDate(month: 11, day: 11, year: year), "Veterans Day observed—thank you to all who served."),
+            (electionDay, "Election Day—schools are closed today."),
+            (thanksgivingEve, "Happy Thanksgiving break! Safe travels."),
+            (thanksgiving, "Happy Thanksgiving! Enjoy the feast."),
+            (dayAfterThanksgiving, "Enjoy the rest of Thanksgiving break!"),
+            (fixedDate(month: 12, day: 24, year: year), "Merry Christmas Eve!"),
+            (fixedDate(month: 12, day: 25, year: year), "Merry Christmas!"),
+            (observedDate(month: 12, day: 25, year: year), "Christmas Day observed—enjoy the holiday!"),
+            (fixedDate(month: 12, day: 26, year: year), "Winter break is in full swing—see you soon!"),
+            (fixedDate(month: 12, day: 27, year: year), "Winter break continues. Stay cozy!"),
+            (fixedDate(month: 12, day: 28, year: year), "Winter break vibes only today."),
+            (fixedDate(month: 12, day: 29, year: year), "Still on winter break—enjoy the downtime!"),
+            (fixedDate(month: 12, day: 30, year: year), "Winter break is almost over—make it count!"),
+            (fixedDate(month: 12, day: 31, year: year), "Happy New Year's Eve! See you next year."),
+        ]
+
+        for (candidate, message) in matches {
+            if let candidate, calendar.isDate(date, inSameDayAs: candidate) {
+                return message
+            }
+        }
+        return nil
+    }
+
+    private func fixedDate(month: Int, day: Int, year: Int) -> Date? {
+        calendar.date(from: DateComponents(year: year, month: month, day: day))
+    }
+
+    private func observedDate(month: Int, day: Int, year: Int) -> Date? {
+        guard let actual = fixedDate(month: month, day: day, year: year) else { return nil }
+        let weekday = calendar.component(.weekday, from: actual)
+        switch weekday {
+        case 7:
+            return calendar.date(byAdding: .day, value: -1, to: actual)
+        case 1:
+            return calendar.date(byAdding: .day, value: 1, to: actual)
+        default:
+            return nil
+        }
+    }
+
+    private func nthWeekday(_ weekday: Int, ordinal: Int, month: Int, year: Int) -> Date? {
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.weekday = weekday
+        components.weekdayOrdinal = ordinal
+        return calendar.date(from: components)
+    }
+
+    private func lastWeekday(_ weekday: Int, month: Int, year: Int) -> Date? {
+        guard let firstDay = fixedDate(month: month, day: 1, year: year),
+              let range = calendar.range(of: .day, in: .month, for: firstDay) else { return nil }
+        for day in range.reversed() {
+            if let candidate = fixedDate(month: month, day: day, year: year),
+               calendar.component(.weekday, from: candidate) == weekday {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    private func electionDay(forYear year: Int) -> Date? {
+        guard let firstMonday = nthWeekday(2, ordinal: 1, month: 11, year: year) else { return nil }
+        return calendar.date(byAdding: .day, value: 1, to: firstMonday)
+    }
+
+    private func easterDate(forYear year: Int) -> Date? {
+        let a = year % 19
+        let b = year / 100
+        let c = year % 100
+        let d = b / 4
+        let e = b % 4
+        let f = (b + 8) / 25
+        let g = (b - f + 1) / 3
+        let h = (19 * a + b - d - g + 15) % 30
+        let i = c / 4
+        let k = c % 4
+        let l = (32 + 2 * e + 2 * i - h - k) % 7
+        let m = (a + 11 * h + 22 * l) / 451
+        let month = (h + l - 7 * m + 114) / 31
+        let day = ((h + l - 7 * m + 114) % 31) + 1
+        return fixedDate(month: month, day: day, year: year)
+    }
+
+    private func hebrewHoliday(month: Int, day: Int, gregorianYear: Int, occursInAutumn: Bool) -> Date? {
+        let hebrewCalendar = Calendar(identifier: .hebrew)
+        let hebrewYear = gregorianYear + (occursInAutumn ? 3761 : 3760)
+
+        var components = DateComponents()
+        components.calendar = hebrewCalendar
+        components.year = hebrewYear
+        components.month = month
+        components.day = day
+
+        guard let date = hebrewCalendar.date(from: components) else { return nil }
+        let normalized = calendar.startOfDay(for: date)
+        return calendar.component(.year, from: normalized) == gregorianYear ? normalized : nil
+    }
+
+    private func islamicHoliday(month: Int, day: Int, gregorianYear: Int) -> Date? {
+        let islamicCalendar = Calendar(identifier: .islamicUmmAlQura)
+        let baseYear = gregorianYear - 579
+
+        for delta in -1...1 {
+            var components = DateComponents()
+            components.calendar = islamicCalendar
+            components.year = baseYear + delta
+            components.month = month
+            components.day = day
+
+            guard let date = islamicCalendar.date(from: components) else { continue }
+            let normalized = calendar.startOfDay(for: date)
+            if calendar.component(.year, from: normalized) == gregorianYear {
+                return normalized
+            }
+        }
+
+        return nil
+    }
+
+    private func lunarNewYearDate(for year: Int) -> Date? {
+        let knownDates: [Int: (Int, Int)] = [
+            2023: (1, 22),
+            2024: (2, 10),
+            2025: (1, 29),
+            2026: (2, 17),
+            2027: (2, 6),
+            2028: (1, 26),
+            2029: (2, 13),
+            2030: (2, 3)
+        ]
+        guard let (month, day) = knownDates[year] else { return nil }
+        return fixedDate(month: month, day: day, year: year)
+    }
+
+    private func diwaliDate(for year: Int) -> Date? {
+        let knownDates: [Int: (Int, Int)] = [
+            2023: (11, 12),
+            2024: (11, 1),
+            2025: (10, 20),
+            2026: (11, 8),
+            2027: (10, 29),
+            2028: (10, 17),
+            2029: (11, 5),
+            2030: (10, 26)
+        ]
+        guard let (month, day) = knownDates[year] else { return nil }
+        return fixedDate(month: month, day: day, year: year)
+    }
+
     init(config: AppConfig, date: Date = Date()) {
         self.config = config
         self.displayedDate = date.startOfDay(in: calendar)
@@ -560,14 +770,14 @@ final class LunchViewModel: ObservableObject {
                     .compactMap { $0.food }
 
                 if foods.isEmpty {
-                    errorMessage = isWeekend ? randomWeekendMessage() : "No lunch posted yet."
+                    errorMessage = messageForNoLunch(on: date, weekdayFallback: "No lunch posted yet.")
                     preferredHeight = Self.height(for: 0)
                 } else {
                     items = foods
                     preferredHeight = Self.height(for: foods.count)
                 }
             } else {
-                errorMessage = isWeekend ? randomWeekendMessage() : "No menu for this date."
+                errorMessage = messageForNoLunch(on: date, weekdayFallback: "No menu for this date.")
                 preferredHeight = Self.height(for: 0)
             }
         } catch let error as LunchError {

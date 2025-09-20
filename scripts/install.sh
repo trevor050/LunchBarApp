@@ -6,6 +6,12 @@ PRODUCT_NAME="LunchBarApp"
 APP_DIR="${PROJECT_ROOT}/dist/${PRODUCT_NAME}.app"
 BUNDLE_ID="com.example.LunchBarApp"
 TARGET_APPS_DIR="${HOME}/Applications"
+RESOURCES_DIR="${PROJECT_ROOT}/Resources"
+ICON_SOURCE="${RESOURCES_DIR}/AppIcon.icns"
+CONFIG_SOURCE="${PROJECT_ROOT}/.env"
+SUPPORT_DIR="${HOME}/Library/Application Support/LunchBarApp"
+CONFIG_DEST="${SUPPORT_DIR}/config.env"
+DESKTOP_DIR="${HOME}/Desktop"
 
 mkdir -p "${PROJECT_ROOT}/dist"
 
@@ -34,6 +40,8 @@ cat > "${APP_DIR}/Contents/Info.plist" <<PLIST
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>${PRODUCT_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -53,9 +61,36 @@ PLIST
 cp "${PROJECT_ROOT}/.build/release/${PRODUCT_NAME}" "${APP_DIR}/Contents/MacOS/${PRODUCT_NAME}"
 chmod +x "${APP_DIR}/Contents/MacOS/${PRODUCT_NAME}"
 
+if [[ -f "${ICON_SOURCE}" ]]; then
+    cp "${ICON_SOURCE}" "${APP_DIR}/Contents/Resources/AppIcon.icns"
+fi
+
 mkdir -p "${TARGET_APPS_DIR}"
 rm -rf "${TARGET_APPS_DIR}/${PRODUCT_NAME}.app"
 cp -R "${APP_DIR}" "${TARGET_APPS_DIR}/"
+
+if [[ -f "${CONFIG_SOURCE}" ]]; then
+    mkdir -p "${SUPPORT_DIR}"
+    cp "${CONFIG_SOURCE}" "${CONFIG_DEST}"
+fi
+
+rm -f "${DESKTOP_DIR}/${PRODUCT_NAME}" \
+      "${DESKTOP_DIR}/${PRODUCT_NAME}.app" \
+      "${DESKTOP_DIR}/${PRODUCT_NAME}.app alias"
+
+if command -v osascript >/dev/null 2>&1; then
+    osascript <<OSA >/dev/null
+set targetPath to POSIX file "${TARGET_APPS_DIR}/${PRODUCT_NAME}.app"
+set desktopFolder to POSIX file "${DESKTOP_DIR}"
+tell application "Finder"
+    set aliasName to "${PRODUCT_NAME}"
+    set newAlias to make new alias file at desktopFolder to targetPath
+    set name of newAlias to aliasName
+end tell
+OSA
+else
+    ln -sfn "${TARGET_APPS_DIR}/${PRODUCT_NAME}.app" "${DESKTOP_DIR}/${PRODUCT_NAME}.app"
+fi
 
 echo "Installed ${PRODUCT_NAME}.app to ${TARGET_APPS_DIR}" \
      "(binary also available in dist/)."

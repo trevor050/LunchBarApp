@@ -8,6 +8,7 @@ Lightweight macOS menu bar app for checking your Nutrislice lunch menu without o
 - Smooth day navigation with cached layout (no window jumps).
 - Graceful handling of items without images.
 - Environment-based configuration so you can point to any Nutrislice-supported school without editing code.
+- Polished Finder/Spotlight icon for easier discovery.
 
 ## Requirements
 - macOS 13 Ventura or newer (Apple Silicon).
@@ -30,6 +31,7 @@ Lightweight macOS menu bar app for checking your Nutrislice lunch menu without o
    NUTRISLICE_MENU_TYPE="lunch"
    ```
    > You can also skip the file and export the same variables in your shell before launching the app.
+   > The installer copies `.env` into `~/Library/Application Support/LunchBarApp/config.env`, which the bundled app reads automatically.
 3. Build a release binary:
    ```bash
    swift build -c release
@@ -47,7 +49,9 @@ Run the helper script to build, assemble a `.app`, and copy it into `~/Applicati
 ```bash
 scripts/install.sh
 ```
-You can then drag it to the Dock or assign macOS shortcuts as usual.
+If a `.env` file is present in the project root it will be synced to
+`~/Library/Application Support/LunchBarApp/config.env`. You can then drag
+the app to the Dock or assign macOS shortcuts as usual.
 
 ## Packaging for a Release
 To publish a binary for a GitHub release:

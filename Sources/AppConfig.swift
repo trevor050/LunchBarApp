@@ -36,7 +36,7 @@ struct AppConfig {
 
         // 2. Search for dotenv-style files in common locations
         let fileManager = FileManager.default
-        let searchPaths: [URL] = [
+        var searchPaths: [URL] = [
             URL(fileURLWithPath: "./.env"),
             fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".lunchbar.env"),
             fileManager.homeDirectoryForCurrentUser
@@ -45,6 +45,16 @@ struct AppConfig {
                 .appendingPathComponent("LunchBarApp")
                 .appendingPathComponent("config.env")
         ]
+
+        if let resourceURL = Bundle.main.resourceURL {
+            searchPaths.append(resourceURL.appendingPathComponent("config.env"))
+            searchPaths.append(resourceURL.appendingPathComponent(".env"))
+        }
+
+        let bundleURL = Bundle.main.bundleURL
+        let contentsURL = bundleURL.appendingPathComponent("Contents/Resources")
+        searchPaths.append(contentsURL.appendingPathComponent("config.env"))
+        searchPaths.append(contentsURL.appendingPathComponent(".env"))
 
         for path in searchPaths {
             if let envString = try? String(contentsOf: path, encoding: .utf8) {
