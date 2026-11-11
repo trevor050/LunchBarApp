@@ -32,6 +32,7 @@ struct PopoverView: View {
                     Text(DayTitle.subtitle(for: model.day, today: model.today))
                         .scaledFont(.body)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
@@ -136,12 +137,13 @@ struct PopoverView: View {
         let next = model.nextMenuDay
         let nextTitle = next.map { "Next menu: \(DayTitle.title(for: $0, today: model.today))" }
         let nextAction: (() -> Void)? = next.map { date in { model.go(to: date) } }
+        let dayName = model.day == model.today ? "today" : "on \(DayTitle.title(for: model.day, today: model.today))"
         switch reason {
         case .holiday(let name):
-            StateMessage(symbol: "calendar", title: name, message: "No menu today.",
+            StateMessage(symbol: "calendar", title: name, message: "No menu \(dayName).",
                          actionTitle: nextTitle, action: nextAction)
         case .weekend:
-            StateMessage(symbol: "sun.max", title: "It's the weekend", message: "Nothing on the menu today.",
+            StateMessage(symbol: "sun.max", title: "It's the weekend", message: "Nothing on the menu \(dayName).",
                          actionTitle: nextTitle, action: nextAction)
         case .notPosted(let notes):
             StateMessage(symbol: "tray", title: "No menu posted",
@@ -278,10 +280,6 @@ enum DayTitle {
 
     static func subtitle(for day: LocalDate, today: LocalDate) -> String {
         guard let date = day.date() else { return "" }
-        let offset = today.days(until: day)
-        if (-1...1).contains(offset) {
-            return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-        }
         if day.year != today.year {
             return date.formatted(.dateTime.month(.abbreviated).day().year())
         }

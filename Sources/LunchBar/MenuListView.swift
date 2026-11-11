@@ -31,12 +31,6 @@ struct MenuListView: View {
                         )
                     }
                 }
-                if !day.notes.isEmpty {
-                    Text(day.notes.joined(separator: "\n"))
-                        .scaledFont(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(16)
-                }
             }
             .padding(.bottom, 8)
         }

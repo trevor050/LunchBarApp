@@ -4,9 +4,16 @@ import SwiftUI
 
 /// Renders the real popover (with live data) to PNG files without showing any UI.
 ///
-///     LunchBar --render-snapshots <out-dir> <district> <school-slug> <menu-type> <yyyy-mm-dd>
+///     LunchBar --render-snapshots <out-dir> <district> <school-slug> <menu-type> <yyyy-mm-dd> [options]
 ///
-/// Used to produce README images and to eyeball layout changes in light and dark mode.
+/// Options:
+///   --steps N        press the next-day arrow N times (negative for previous) before rendering
+///   --offline        load once, then lose the network and refresh (stale-copy banner)
+///   --offline-cold   no network from the start (offline empty state)
+///   --avoid-milk     flag milk as an avoided allergen
+///   --settings       also render the Settings window and the first-run school picker
+///
+/// Used to produce README images and to check every state in light and dark mode.
 @MainActor
 enum SnapshotRenderer {
     static func run(arguments: [String]) {
@@ -24,7 +31,8 @@ enum SnapshotRenderer {
         let defaults = UserDefaults(suiteName: "LunchBarSnapshots")!
         defaults.removePersistentDomain(forName: "LunchBarSnapshots")
         let settings = AppSettings(defaults: defaults)
-        let client = NutrisliceClient()
+        let network = SwitchableLoader()
+        let client = NutrisliceClient(loader: network)
 
         var schools: [School]?
         var districtName: String?
@@ -44,12 +52,26 @@ enum SnapshotRenderer {
         let noon = day.date().map { $0.addingTimeInterval(12 * 3600) } ?? Date()
         let repository = MenuRepository(client: client, cache: MenuCache(directory: nil))
         let model = MenuViewModel(settings: settings, repository: repository, now: { noon })
+        let settle = { spin(until: { model.phase != .loading && !model.isRefreshing }, timeout: 20) }
+        if arguments.contains("--offline-cold") { network.isOffline = true }
         model.popoverWillOpen()
-        spin(until: { model.phase != .loading && !model.isRefreshing }, timeout: 20)
+        settle()
+        if let index = arguments.firstIndex(of: "--steps"), arguments.indices.contains(index + 1), let steps = Int(arguments[index + 1]) {
+            for _ in 0..<abs(steps) {
+                steps > 0 ? model.showNext() : model.showPrevious()
+                settle()
+            }
+        }
+        if arguments.contains("--offline") {
+            network.isOffline = true
+            model.refresh()
+            settle()
+        }
 
         let popover = PopoverView(model: model, openSettings: {}, quit: {})
             .background(Color(nsColor: .windowBackgroundColor))
-        let name = "\(district)-\(schoolSlug)-\(menuSlug)-\(day.isoString)"
+        var name = "\(district)-\(schoolSlug)-\(menuSlug)-\(model.day.isoString)"
+        if network.isOffline { name += "-offline" }
         render(popover, size: PopoverView.size, appearance: .aqua, to: output.appending(path: "\(name)-light.png"))
         render(popover, size: PopoverView.size, appearance: .darkAqua, to: output.appending(path: "\(name)-dark.png"))
 
@@ -106,5 +128,22 @@ enum SnapshotRenderer {
         while !done() && Date() < deadline {
             RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
         }
+    }
+}
+
+/// Real URLSession, plus a switch that makes every request fail the way a
+/// dropped connection does.
+private final class SwitchableLoader: HTTPLoading, @unchecked Sendable {
+    private let lock = NSLock()
+    private var offline = false
+
+    var isOffline: Bool {
+        get { lock.withLock { offline } }
+        set { lock.withLock { offline = newValue } }
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        if isOffline { throw URLError(.notConnectedToInternet) }
+        return try await NutrisliceClient.defaultSession.data(for: request)
     }
 }

@@ -21,7 +21,9 @@ public struct MenuDay: Codable, Hashable, Sendable, Identifiable {
     public var sections: [MenuSection]
     /// Set when the district marked the day as a holiday ("Thanksgiving", "No School", ...).
     public var holiday: String?
-    /// Free-text lines the district added that aren't food or holidays.
+    /// Free-text lines the district added that aren't food or holidays. On days
+    /// with food these are mostly connectors ("or", "Choice of:"), so the app only
+    /// shows them when there's no food to show.
     public var notes: [String]
 
     public init(date: LocalDate, sections: [MenuSection], holiday: String? = nil, notes: [String] = []) {
