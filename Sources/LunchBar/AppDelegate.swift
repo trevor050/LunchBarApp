@@ -36,6 +36,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         setUpStatusItem()
         setUpPanel()
+        if PanelSelfTest.enabled {
+            // The self-test shares the bundle's notification center and hotkey with
+            // the owner's copy: never register, schedule or remove anything there.
+            Task { await PanelSelfTest.run(delegate: self) }
+            return
+        }
         registerHotKey()
         NotificationCenter.default.addObserver(forName: .lunchBarSuspendHotKey, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hotKey.unregister() }
@@ -47,8 +53,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notifier.startDailyChecks { [weak self] in self?.checkFavorites() }
 
         Task { await repository.cache.prune(olderThan: LocalDate(Date()).adding(days: -60)) }
-
-        if PanelSelfTest.enabled { Task { await PanelSelfTest.run(delegate: self) } }
 
         if settings.source == nil {
             showSettings()
@@ -124,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func togglePanel() { panel?.toggle() }
     var statusButtonFrame: NSRect? { statusItem?.button?.window?.frame }
+    var statusButtonWindow: NSWindow? { statusItem?.button?.window }
     var statusButtonHighlighted: Bool { statusItem?.button?.isHighlighted ?? false }
     func showPanel() { panel?.show() }
 

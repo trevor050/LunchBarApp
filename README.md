@@ -5,21 +5,24 @@ A tiny Mac menu bar app that tells you what's for lunch. Click the fork and knif
 I originally built it for my own high school's menu. It now works with Nutrislice schools and Rutgers dining halls, including the older FoodPro menus. Rutgers’ current official menu links now go to Nutrislice too, so The Atrium is in the Rutgers current-menu picker.
 
 <p>
-  <img src="docs/images/popover-dark.png" width="360" alt="LunchBar popover in dark mode showing Monday's lunch at Middlesex High: cheeseburger, hamburger, black bean burger, baked beans and spiral fries, with calories">
-  <img src="docs/images/popover-allergens-light.png" width="360" alt="LunchBar popover in light mode for Auburn Elementary, with items containing milk flagged in orange and Halal, Vegan and Vegetarian tags">
+  <img src="docs/images/panel-dark.png" width="360" alt="LunchBar in dark mode showing Monday's lunch at Middlesex High: a chicken and waffle sandwich and crinkle-cut fries, each with a photo and its calories on the right">
+  <img src="docs/images/panel-item-dark.png" width="360" alt="An expanded item: a large photo of tater tots, then calories, protein, carbs and fat in one row, allergens, serving size and the school's description">
 </p>
-
-<img src="docs/verification/rutgers-cold/rutgers-foodpro-04-Lunch-2026-11-10-dark.png" width="360" alt="Busch lunch: five highest-protein options with protein, calories and stations, followed by collapsed stations">
+<p>
+  <img src="docs/images/panel-allergens-light.png" width="360" alt="LunchBar in light mode for Auburn Elementary with milk avoided: items containing milk are flagged in orange, with Halal, Vegan and Vegetarian tags">
+  <img src="docs/verification/rutgers-cold/rutgers-foodpro-04-Lunch-2026-11-11-dark.png" width="360" alt="Busch Dining Hall lunch: a filter for 143 items, the five highest-protein choices with grams and calories, then collapsed stations">
+</p>
 
 ## What it does
 
 - Opens straight to today's menu. On weekends it jumps to Monday instead of showing you an empty Saturday.
 - ← and → browse days, T jumps back to today. Weekends are skipped unless you turn that off (dining halls that serve every day exist).
-- Save several places, then switch place or meal from the popover header. Your existing school is saved automatically.
-- Top protein shows up to five published choices, with grams, calories and station. Settings chooses grams per serving or protein per 100 calories. It works for either provider, and stays out of the way when protein isn’t published.
+- Save several places, then switch place or meal from the header. Your existing school is saved automatically.
+- Every item shows its calories on the right, where you can scan them, next to the food photo when the district publishes one.
+- Top protein shows up to five published choices, with grams, calories and station. Settings chooses grams per serving or protein per 100 calories. It only appears on menus big enough for it to help (at least eight ranked items, and never most of the menu), so a two-item lunch isn't listed twice.
 - Large menus get a name filter and collapsible stations, collapsed by default above 25 items. Station choices are remembered.
 - Small ounce portions at explicitly ingredient/build-your-own stations are excluded from the ranking, while remaining in the full menu. Entree stations, EACH/SLICE servings and portions over 2 OZ remain eligible. [Exact rule and limits](docs/research/protein-ranking.md).
-- Click an item for calories, nutrition facts, ingredients and allergens, when your district publishes them.
+- Click an item for a big photo, calories, protein, carbs and fat at a glance, and allergens. The full nutrition label and ingredients are one more click away.
 - Pick allergens to avoid and items that contain them get flagged. Vegan, vegetarian and halal tags show up when the district marks them.
 - Star a favorite and get a 7:30 AM notification on days it's served. (Chicken patty day deserves a heads up.)
 - Menus you've opened stay available offline, with a note that you're looking at a saved copy.
@@ -89,7 +92,7 @@ Each district has a public, unauthenticated API at `https://<district>.api.nutri
 It tries to be a polite guest:
 
 - A whole week comes back in one request, so browsing days inside a week doesn't hit the network.
-- Weeks are cached on disk and refreshed at most once an hour, only when you open the popover.
+- Weeks are cached on disk and refreshed at most once an hour, only when you open the menu.
 - There's no polling. With favorite notifications on, it checks once a day (at launch, on wake and at 6 AM), which usually hits the cache.
 - Requests identify themselves with a `LunchBar/2.0` user agent that links back here.
 
@@ -97,7 +100,7 @@ It tries to be a polite guest:
 
 FoodPro serves HTML, not a supported API. Station headings become sections. A combined nutrition report supplies individual recipe nutrients, so LunchBar does not request a label for every item just to rank protein. Labels load on expansion; when you avoid an allergen, candidate labels load in ranking order until five eligible choices are known. Unknown labels do not enter that top group while an allergen is selected.
 
-FoodPro requests are serialized, spaced at least 350 ms apart, identify LunchBar and this repository, and back off on errors. There is no FoodPro timer or background fetch. Menus cache per hall/meal/date for an hour; recipe **and portion** nutrition caches for 30 days. Busch lunch on November 10 had 141 items: **3 requests on a cold open, 0 on a warm reopen**, measured with an empty app cache. Allergen checking and expanding labels add requests as needed. [Source investigation and fragility](docs/research/rutgers-foodpro.md), [label comparisons](docs/verification/rutgers-label-check.json).
+FoodPro requests are serialized, spaced at least 350 ms apart, identify LunchBar and this repository, and back off on errors. There is no FoodPro timer or background fetch. Menus cache per hall/meal/date for an hour; recipe **and portion** nutrition caches for 30 days. Busch lunch on November 11 had 143 items: **3 requests on a cold open, 0 on a warm reopen**, measured with an empty app cache (the snapshot mode prints `requests cold=3 warm=0`). Allergen checking and expanding labels add requests as needed. [Source investigation and fragility](docs/research/rutgers-foodpro.md), [label comparisons](docs/verification/rutgers-label-check.json).
 
 The observed date window was seven days. FoodPro can return menu HTML outside that window, including closed dates; LunchBar checks the published date dropdown and rejects that fallback. Hostnames, markup, form tokens and menu names can change without notice. This adapter can break when they do.
 
@@ -109,7 +112,7 @@ Historical measurements of the Nutrislice-only 2.0 build, before the Rutgers ada
 | --- | --- | --- |
 | CPU time used over 60 s idle | 0.00 s and 0.01 s (two runs) | `ps -o time= -p $(pgrep -x LunchBar)`, sampled 60 s apart |
 | Memory footprint | 11–12 MB | `footprint $(pgrep -x LunchBar)` |
-| Network requests at launch | 0 | no files in `~/Library/Caches/io.github.trevor050.LunchBar` until the popover is opened |
+| Network requests at launch | 0 | no files in `~/Library/Caches/io.github.trevor050.LunchBar` until the menu is opened |
 | App size (arm64 build) | 2.2 MB unzipped, 0.8 MB zipped | `scripts/build-app.sh` output |
 
 ## Development
@@ -123,17 +126,20 @@ swift run LunchBar       # run without bundling (login items and notifications a
 The code is split in two targets:
 
 - `Sources/LunchKit`: provider interface, Nutrislice and Rutgers FoodPro clients/parsers, protein ranking, caches, date math and link parsing. No UI, tested in `Tests/LunchKitTests`, which run against recorded API responses from three districts in `Tests/LunchKitTests/Fixtures`.
-- `Sources/LunchBar`: the AppKit status item and popover, SwiftUI views, settings, global hotkey, login item and notifications.
+- `Sources/LunchBar`: the AppKit status item and menu window, SwiftUI views, settings, global hotkey, login item and notifications.
 
-The README images come from the app's own snapshot mode, which renders the real popover with live data in light and dark mode:
+The README images come from the app's own snapshot mode, which renders the real menu window content with live data in light and dark mode:
 
 ```bash
-swift run LunchBar --render-snapshots docs/shots middlesex middlesex-high lunch 2026-11-10
-swift run LunchBar --render-snapshots docs/shots rutgers-foodpro 04 Lunch 2026-11-10 --protein-lean
+swift run LunchBar --render-snapshots docs/shots middlesex middlesex-high lunch 2026-11-09
+swift run LunchBar --render-snapshots docs/shots middlesex middlesex-high lunch 2026-11-11 --expand tot
+swift run LunchBar --render-snapshots docs/shots salkeiz auburn-elementary lunch 2026-11-10 --avoid-milk
+swift run LunchBar --render-snapshots docs/shots rutgers-foodpro 04 Lunch 2026-11-11 --text-size large
 # Real hall/meal/day and saved-place matrix, plus Middlesex:
 swift run LunchBar --render-snapshots docs/matrix rutgers-foodpro 04 Lunch 2026-11-10 --matrix
-# Real status-item placement stress test (logs frames, no screen recording):
-dist/LunchBar.app/Contents/MacOS/LunchBar --self-test-popover 360 --right-edge
+# Drives the real status item and menu window through 400 content changes and checks
+# its geometry after each one (JSON lines on stdout, exit 1 on the first violation):
+dist/LunchBar.app/Contents/MacOS/LunchBar --self-test-panel 400 --right-edge
 ```
 
 Releases are built by GitHub Actions when a `v*` tag is pushed. CI builds and tests every pull request.

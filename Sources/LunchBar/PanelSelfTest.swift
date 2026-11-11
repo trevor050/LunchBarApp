@@ -61,7 +61,9 @@ enum PanelSelfTest {
     }
 
     private static func cleanUp() {
-        UserDefaults.standard.removeObject(forKey: "NSStatusItem Preferred Position LunchBarPanelSelfTest")
+        for key in ["NSStatusItem Preferred Position", "NSStatusItem Visible", "NSStatusItem VisibleCC"] {
+            UserDefaults.standard.removeObject(forKey: key + " LunchBarPanelSelfTest")
+        }
         UserDefaults.standard.removePersistentDomain(forName: suite)
     }
 
@@ -72,6 +74,14 @@ enum PanelSelfTest {
         let model = delegate.model
         let panel = controller.panel
 
+        // Status item moves while the panel is open: with an auto-hiding menu bar
+        // the item's window slides vertically. The panel must not follow.
+        var statusMovesWhileOpen: [String] = []
+        if let buttonWindow = delegate.statusButtonWindow {
+            NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: buttonWindow, queue: nil) { _ in
+                MainActor.assumeIsolated { if controller.isShown { statusMovesWhileOpen.append(describe(buttonWindow.frame)) } }
+            }
+        }
         // Every frame AppKit reports for the panel, in order.
         var observed: [NSRect] = []
         for name in [NSWindow.didResizeNotification, NSWindow.didMoveNotification] {
@@ -146,11 +156,26 @@ enum PanelSelfTest {
         let highlightedClosed = delegate.statusButtonHighlighted
         delegate.togglePanel()
         await settle()
-        let toggleOpened = controller.isShown && panel.isKeyWindow
+        let toggleShown = controller.isShown
+        let toggleKey = panel.isKeyWindow
+        // The owner's real case: LunchBar is not the active app when the status
+        // item is clicked or the shortcut pressed.
+        controller.close()
+        NSApp.deactivate()
+        await settle()
+        let wasActive = NSApp.isActive
+        let fallbacksBefore = controller.focusFallbacks
+        delegate.togglePanel()
+        await settle()
+        let inactiveKey = controller.isShown && panel.isKeyWindow
+        let usedFallback = controller.focusFallbacks > fallbacksBefore
+        let toggleOpened = toggleShown && toggleKey && inactiveKey
         let interaction: [String: Any] = ["event": "interaction", "rightArrowNextDay": arrowMoved, "leftArrowBack": arrowBack,
                                           "escapeClearsFilter": escapeClearedFilter, "escapeCloses": escapeClosed,
                                           "highlightWhileOpen": highlightedOpen, "highlightAfterClose": highlightedClosed,
-                                          "toggleReopensKey": toggleOpened]
+                                          "toggleReopensKey": toggleOpened, "toggleShown": toggleShown, "toggleKey": toggleKey,
+                                          "inactiveBeforeToggle": !wasActive, "inactiveToggleKey": inactiveKey, "inactiveToggleUsedFallback": usedFallback,
+                                          "keyWindow": NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "none", "active": NSApp.isActive]
         log(interaction)
         if !(arrowMoved && arrowBack && escapeClearedFilter && escapeClosed && highlightedOpen && !highlightedClosed && toggleOpened) {
             fail("interaction check", interaction)
@@ -238,6 +263,8 @@ enum PanelSelfTest {
             if case .menu(let day) = model.phase { record["items"] = day.items.count }
 
             if reopened {
+                record["key"] = panel.isKeyWindow
+                if !panel.isKeyWindow { fail("reopened without key focus", record) }
                 // A reopen hangs from wherever the status item is now (an auto-hiding
                 // menu bar may have been revealed or hidden in between).
                 let icon = delegate.statusButtonFrame ?? .zero
@@ -287,7 +314,8 @@ enum PanelSelfTest {
         log(["result": "passed", "steps": steps, "resizes": totalResizes, "maxResizesPerStep": maxResizesPerStep,
              "frameEvents": totalFrameEvents, "maxFrameEventsPerStep": maxFrameEventsPerStep, "stepsWithTwoContentUpdates": multiUpdateSteps,
              "distinctHeights": heights.sorted(), "actions": kinds, "animates": controller.animates,
-             "top": openTop, "x": openX])
+             "top": openTop, "x": openX, "focusFallbacks": controller.focusFallbacks,
+             "statusItemMovesWhileOpen": statusMovesWhileOpen.count, "statusItemFramesWhileOpen": Array(Set(statusMovesWhileOpen)).sorted()])
         controller.close()
         cleanUp()
         NSApp.terminate(nil)

@@ -48,8 +48,13 @@ enum PanelGeometry {
     /// can be nil, and a hidden item's window can sit just above its screen, so
     /// match on x and take the screen whose top edge is nearest the item.
     static func screen(for icon: NSRect) -> NSScreen? {
-        let columns = NSScreen.screens.filter { icon.midX >= $0.frame.minX && icon.midX < $0.frame.maxX }
-        return columns.min { abs($0.frame.maxY - icon.midY) < abs($1.frame.maxY - icon.midY) } ?? NSScreen.main
+        let screens = NSScreen.screens
+        return screenIndex(for: icon, frames: screens.map(\.frame)).map { screens[$0] } ?? NSScreen.main
+    }
+
+    static func screenIndex(for icon: NSRect, frames: [NSRect]) -> Int? {
+        let columns = frames.indices.filter { icon.midX >= frames[$0].minX && icon.midX < frames[$0].maxX }
+        return columns.min { abs(frames[$0].maxY - icon.midY) < abs(frames[$1].maxY - icon.midY) }
     }
 }
 
@@ -168,6 +173,12 @@ final class MenuPanelController: NSObject, NSWindowDelegate {
     private var lastDismissal = Date.distantPast
     /// Resizes this controller performed, for the self-test.
     private(set) var resizes: [Resize] = []
+    /// Times the panel opened without key focus and the app had to activate.
+    private(set) var focusFallbacks = 0
+    /// The app that was in front when the panel opened, and whether opening the
+    /// panel activated LunchBar. Closing hands activation back to it.
+    private var previousApp: NSRunningApplication?
+    private var activatedForPanel = false
     var animates = true
     var dismissesOnFocusLoss = true
     var onClose: (() -> Void)?
@@ -222,6 +233,19 @@ final class MenuPanelController: NSObject, NSWindowDelegate {
         }
         panel.alphaValue = 1
         panel.makeKeyAndOrderFront(nil)
+        let front = NSWorkspace.shared.frontmostApplication
+        previousApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
+        activatedForPanel = false
+        if !panel.isKeyWindow {
+            // An inactive accessory app cannot always give its panel key focus.
+            // Ask to activate (as the old popover always did); activation arrives
+            // asynchronously, and the didBecomeActive observer makes the panel key.
+            focusFallbacks += 1
+            // The plain `activate()` is a cooperative request that macOS may refuse
+            // for an accessory app; this form still takes focus as popovers did.
+            NSApp.activate(ignoringOtherApps: true)
+            activatedForPanel = true
+        }
         // Keep the filter field from grabbing focus on open: arrow keys and T
         // should navigate days until the person clicks or tabs into a control.
         panel.makeFirstResponder(nil)
@@ -243,6 +267,15 @@ final class MenuPanelController: NSObject, NSWindowDelegate {
         isAnimating = false
         panel.orderOut(nil)
         statusButton?.highlight(false)
+        // Only if opening the panel activated LunchBar, and only while LunchBar is
+        // still the active app (a click elsewhere already moved focus on its own).
+        if activatedForPanel, NSApp.isActive, let previousApp, !previousApp.isTerminated,
+           !NSApp.windows.contains(where: { $0 !== panel && $0.isVisible && $0.canBecomeMain }) {
+            NSApp.yieldActivation(to: previousApp)
+            previousApp.activate()
+        }
+        activatedForPanel = false
+        previousApp = nil
         onClose?()
     }
 
@@ -274,6 +307,12 @@ final class MenuPanelController: NSObject, NSWindowDelegate {
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             guard app?.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
             MainActor.assumeIsolated { if self?.dismissesOnFocusLoss == true { self?.dismiss() } }
+        })
+        observers.append(center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isShown, !self.panel.isKeyWindow else { return }
+                self.panel.makeKey()
+            }
         })
         observers.append(workspace.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { if self?.dismissesOnFocusLoss == true { self?.dismiss() } }

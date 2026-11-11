@@ -181,7 +181,9 @@ struct MenuItemRow: View {
 
     private var warnings: [AllergenWarning] { item.warnings(avoiding: avoided) }
     private var thumbnail: CGFloat { (48 * min(scale, 1.15)).rounded() }
-    private var largePhoto: Bool { isExpanded && item.imageURL != nil }
+    /// Expanded items lead with their photo when it is a real photo; small images
+    /// (often clip art) keep the thumbnail rather than being blown up.
+    private var largePhoto: Bool { isExpanded && item.imageURL.map(ImageStore.shared.isPhoto) == true }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -361,7 +363,7 @@ struct RemoteImage: View {
     var body: some View {
         Group {
             if let image {
-                Image(nsImage: image).resizable().scaledToFill()
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFill()
             } else {
                 Color.clear
             }
@@ -372,15 +374,24 @@ struct RemoteImage: View {
     }
 }
 
+/// Shared image cache. Observable so a row that depends on whether its photo
+/// has loaded (`isPhoto`) updates when it arrives.
 @MainActor
+@Observable
 final class ImageStore {
     static let shared = ImageStore()
-    private let cache = NSCache<NSURL, NSImage>()
-    private var inFlight: [URL: Task<NSImage?, Never>] = [:]
+    @ObservationIgnored private let cache = NSCache<NSURL, NSImage>()
+    @ObservationIgnored private var inFlight: [URL: Task<NSImage?, Never>] = [:]
+    /// URLs whose loaded image is large enough for a banner.
+    private var photos: Set<URL> = []
 
     init() { cache.countLimit = 300 }
 
     func cached(_ url: URL) -> NSImage? { cache.object(forKey: url as NSURL) }
+
+    /// True for a loaded image large enough to show as a banner (about 300 points
+    /// wide on a Retina display without visible upscaling).
+    func isPhoto(_ url: URL) -> Bool { photos.contains(url) && cached(url) != nil }
 
     func load(_ url: URL) async -> NSImage? {
         if let hit = cached(url) { return hit }
@@ -392,7 +403,11 @@ final class ImageStore {
         inFlight[url] = task
         let image = await task.value
         inFlight[url] = nil
-        if let image { cache.setObject(image, forKey: url as NSURL) }
+        if let image {
+            cache.setObject(image, forKey: url as NSURL)
+            let width = image.representations.map(\.pixelsWide).max() ?? Int(image.size.width)
+            if width >= 320 { photos.insert(url) }
+        }
         return image
     }
 }
