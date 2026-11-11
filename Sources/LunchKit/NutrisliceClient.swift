@@ -65,28 +65,39 @@ public struct NutrisliceClient: Sendable {
     }()
 
     // MARK: URLs
+    //
+    // Built from strings on purpose: `URL.appending(path:)` handles trailing
+    // slashes differently across Foundation releases (macOS 15 produced
+    // `schools//`), and these endpoints are slash-sensitive.
+
+    private static func isValidSlug(_ value: String) -> Bool {
+        value.range(of: #"^[a-z0-9][a-z0-9-]*$"#, options: .regularExpression) != nil
+    }
 
     public static func baseURL(district: String) -> URL? {
-        guard district.range(of: #"^[a-z0-9][a-z0-9-]*$"#, options: .regularExpression) != nil else { return nil }
+        guard isValidSlug(district) else { return nil }
         return URL(string: "https://\(district).api.nutrislice.com/menu/api/")
     }
 
     public static func schoolsURL(district: String) -> URL? {
-        baseURL(district: district)?.appending(path: "schools/")
+        guard let base = baseURL(district: district) else { return nil }
+        return URL(string: base.absoluteString + "schools/")
     }
 
     public static func settingsURL(district: String) -> URL? {
         guard let base = baseURL(district: district) else { return nil }
-        var components = URLComponents(url: base.appending(path: "settings/"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "format", value: "json")]
-        return components?.url
+        return URL(string: base.absoluteString + "settings/?format=json")
     }
 
     public static func weekURL(source: MenuSource, containing day: LocalDate) -> URL? {
+        guard let base = baseURL(district: source.district),
+              let school = source.school.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let type = source.menuType.slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            return nil
+        }
         let start = day.weekStart
-        return baseURL(district: source.district)?
-            .appending(path: "weeks/school/\(source.school.slug)/menu-type/\(source.menuType.slug)/")
-            .appending(path: String(format: "%04d/%02d/%02d/", start.year, start.month, start.day))
+        let date = String(format: "%04d/%02d/%02d", start.year, start.month, start.day)
+        return URL(string: base.absoluteString + "weeks/school/\(school)/menu-type/\(type)/\(date)/")
     }
 
     // MARK: Requests
