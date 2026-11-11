@@ -21,7 +21,7 @@ I originally built it for my own high school's menu. It now works with any schoo
 - Holidays and days off come from your district's own calendar, so "Thanksgiving" shows up when your school says so.
 - Launch at login, a recordable global shortcut, text size options, light and dark mode, VoiceOver labels and full keyboard navigation.
 
-It sits at 0% CPU and about 12 MB of memory while idle (measured below), and it only talks to the network when you actually look at it.
+It uses essentially no CPU and about 12 MB of memory while idle (measured below), and it only talks to the network when you actually look at it.
 
 ## Install
 
@@ -92,8 +92,9 @@ Measured on a 2020 M1 MacBook Air running macOS 26.5, with the release build sit
 
 | Metric | Value | How |
 | --- | --- | --- |
-| CPU time over 60 s idle | 0.00 s | `ps -o time= -p $(pgrep -x LunchBar)`, sampled 60 s apart |
-| Memory footprint | 12 MB | `footprint $(pgrep -x LunchBar)` |
+| CPU time used over 60 s idle | 0.00 s and 0.01 s (two runs) | `ps -o time= -p $(pgrep -x LunchBar)`, sampled 60 s apart |
+| Memory footprint | 11–12 MB | `footprint $(pgrep -x LunchBar)` |
+| Network requests at launch | 0 | no files in `~/Library/Caches/io.github.trevor050.LunchBar` until the popover is opened |
 | App size (arm64 build) | 2.2 MB unzipped, 0.8 MB zipped | `scripts/build-app.sh` output |
 
 ## Development
