@@ -68,7 +68,13 @@ final class FavoriteNotifier {
     /// Asks for permission. Returns whether alerts are allowed.
     func requestAuthorization() async -> Bool {
         guard let center else { return false }
-        return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        // Completion-handler form: the async overload sends the (non-Sendable on
+        // older SDKs) center across actors, which Swift 6.1 rejects.
+        return await withCheckedContinuation { continuation in
+            center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                continuation.resume(returning: granted)
+            }
+        }
     }
 
     /// Reconciles pending notifications for one loaded week.
