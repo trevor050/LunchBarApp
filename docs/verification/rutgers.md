@@ -16,6 +16,8 @@ Reproduce the final matrix:
 dist/LunchBar.app/Contents/MacOS/LunchBar --render-snapshots docs/verification/rutgers-live rutgers-foodpro 04 Lunch 2026-11-11 --matrix
 ```
 
+The final combined release build also passed **120 steps / 960 layout-boundary checks**, with 171 guard corrections, recorded in `popover-final-120.jsonl`.
+
 The separate popover fix is documented in `popover.md`: 360 steps / 2,880 layout checks passed, with 507 guard corrections. AppKit still mispositions in this setup, so the guard remains necessary. Its native arrow appearance and interactive placement should be confirmed by eye by the owner. The final app is left running from `dist/LunchBar.app`.
 
 ## Scope adjustment and limits
