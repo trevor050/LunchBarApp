@@ -335,7 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // MARK: Favorites
 
     private func checkFavorites() {
-        guard let source = settings.source else { return }
+        guard let source = settings.source, source.provider != .rutgersFoodPro else { return }
         guard settings.notifyFavorites, !settings.favorites.isEmpty else {
             notifier.removeAll()
             return

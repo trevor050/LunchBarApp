@@ -1,9 +1,11 @@
 # LunchBar agent notes
 
-Menu bar app (Swift 6 package, macOS 14+) showing any Nutrislice school's menu. Repo name is LunchBarApp; app/product is LunchBar, bundle id `io.github.trevor050.LunchBar`.
+Menu bar app (Swift 6 package, macOS 14+) showing saved Nutrislice schools and Rutgers FoodPro halls. Repo name is LunchBarApp; app/product is LunchBar, bundle id `io.github.trevor050.LunchBar`.
 
 ## Layout
-- `Sources/LunchKit`: no UI. `NutrisliceClient` (public per-district API), `MenuParser` (+ wire DTOs), `MenuCache` (actor, memory + `~/Library/Caches/io.github.trevor050.LunchBar/weeks`), `MenuRepository` (freshness 1h, stale fallback, request coalescing), `LocalDate`, `DayNavigator`, `MenuLink` (district/URL parsing), `Allergens`/`Favorites`.
+- `Sources/LunchKit`: no UI. `MenuProviding` adapters: Nutrislice (weeks) and `RutgersFoodPro` (one day). FoodPro uses SwiftSoup, serial/paced requests, 100-recipe report batches, lazy labels, and a 30-day recipe+portion cache. Read `docs/research/rutgers-foodpro.md` before changing its parser or request policy. `ProteinRanking` rules are in `docs/research/protein-ranking.md`.
+- Existing Nutrislice core: `NutrisliceClient` (public per-district API), `MenuParser` (+ wire DTOs), `MenuCache` (actor, memory + `~/Library/Caches/io.github.trevor050.LunchBar/weeks`), `MenuRepository` (freshness 1h, stale fallback, request coalescing), `LocalDate`, `DayNavigator`, `MenuLink` (district/URL parsing), `Allergens`/`Favorites`.
+- Settings retain `source` for migration and selection; `savedPlaces` is keyed by provider/district/hall (meal updates replace a place). FoodPro day cache keys must use exact date, not week start.
 - `Sources/LunchBar`: AppKit `AppDelegate` (NSStatusItem + NSPopover; not MenuBarExtra because the global hotkey must open it), SwiftUI views, `AppSettings` (UserDefaults, JSON-encoded), `HotKey` (Carbon RegisterEventHotKey), `SystemIntegration` (SMAppService login item, UN notifications), `SnapshotRenderer`.
 - `Tests/LunchKitTests`: Swift Testing, fixtures are raw API responses (schools fixture stripped of address/phone).
 
@@ -31,3 +33,9 @@ Menu bar app (Swift 6 package, macOS 14+) showing any Nutrislice school's menu. 
 - Legacy 1.x config (`~/Library/Application Support/LunchBarApp/config.env`, `~/.lunchbar.env`, env vars) is imported once when no source is set.
 - Don't build API URLs with `URL.appending(path:)`: trailing-slash handling differs between macOS 15 and 26 SDKs (CI on macos-15 produced `schools//`). `NutrisliceClient` concatenates strings.
 - CI is macos-15 / Xcode 16.4 / Swift 6.1, stricter about non-Sendable SDK types (UserNotifications) than local Swift 6.2. Use completion-handler APIs there.
+
+## Rutgers verification
+- Current official Rutgers links now use Nutrislice; all four halls including The Atrium are in its catalog. Verified older FoodPro IDs: 03/04/05 only.
+- FoodPro form tokens require recipe*portion*station; nutrition cache identity is recipe*portion. Fractions occur. HTTP 200 does not prove a successful report.
+- `--render-snapshots docs/shots rutgers-foodpro 04 Lunch YYYY-MM-DD --matrix` exercises three halls, lunch/dinner, that day/next, warm reopens, then Middlesex. `--protein-lean`, `--avoid-milk`, `--expand TEXT`, `--settings` render other real states.
+- Nutrition-load generations need checking after every actor hop; stale tasks must not repaint a newly selected source/date.

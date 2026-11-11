@@ -13,43 +13,119 @@ struct MenuListView: View {
     let day: MenuDay
     let settings: AppSettings
     @Binding var expanded: String?
+    var topItems: [MenuItem] = []
+    var nutritionLoading = false
+    var nutritionNotice: String?
+    var verifiedRecipes: Set<String> = []
+    @Binding var filter: String
+    @State private var visibleTop: [MenuItem] = []
+    @State private var hoveringTop = false
+    @State private var hoveringMenu = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var large: Bool { day.items.count > 25 }
+    private var foodPro: Bool { settings.source?.provider == .rutgersFoodPro }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if large {
+                    TextField("Filter menu", text: $filter, prompt: Text("Filter \(day.items.count) items"))
+                        .textFieldStyle(.roundedBorder).padding(.horizontal, 12).padding(.top, 10)
+                        .accessibilityLabel("Filter items by name")
+                }
+                if filter.isEmpty && (!visibleTop.isEmpty || nutritionLoading || !topItems.isEmpty) {
+                    proteinGroup
+                }
+                if let nutritionNotice {
+                    Text(nutritionNotice).scaledFont(.caption1).foregroundStyle(.secondary)
+                        .padding(.horizontal, 16).padding(.vertical, 8)
+                }
                 ForEach(day.sections) { section in
-                    if let title = section.title {
-                        Text(title)
-                            .scaledFont(.subheadline, weight: .semibold)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .padding(.bottom, 2)
-                            .accessibilityAddTraits(.isHeader)
+                    let matches = section.items.filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
+                    if !matches.isEmpty {
+                        let key = (settings.source?.key ?? "") + "/" + (section.title ?? section.id)
+                        let open = !filter.isEmpty || (settings.stationExpansion[key] ?? !large)
+                        if let title = section.title {
+                            Button {
+                                settings.stationExpansion[key] = !open
+                            } label: {
+                                HStack {
+                                    Text(title).lineLimit(2)
+                                    Spacer()
+                                    Text("\(matches.count)").monospacedDigit()
+                                    Image(systemName: open ? "chevron.down" : "chevron.right").font(.system(size: 9))
+                                }
+                                .scaledFont(.subheadline, weight: .semibold).foregroundStyle(.secondary)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain).padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 5)
+                            .accessibilityLabel("\(title), \(matches.count) items")
+                            .accessibilityValue(open ? "Expanded" : "Collapsed")
+                        }
+                        if open || section.title == nil {
+                            ForEach(matches) { item in row(item) }
+                        }
                     }
-                    ForEach(section.items) { item in
-                        MenuItemRow(
-                            item: item,
-                            warnings: item.warnings(avoiding: settings.avoidedAllergens),
-                            isFavorite: settings.isFavorite(item),
-                            isExpanded: expanded == item.id,
-                            toggleExpanded: { toggle(item) },
-                            toggleFavorite: { settings.toggleFavorite(item) }
-                        )
-                    }
+                }
+                if !filter.isEmpty && !day.items.contains(where: { $0.name.localizedCaseInsensitiveContains(filter) }) {
+                    Text("No matching items").scaledFont(.body).foregroundStyle(.secondary).padding(16)
                 }
             }
             .padding(.bottom, 8)
-            .background(
-                GeometryReader { proxy in
-                    Color.clear.preference(key: MenuListHeightKey.self, value: proxy.size.height)
-                }
-            )
+            .background(GeometryReader { proxy in Color.clear.preference(key: MenuListHeightKey.self, value: proxy.size.height) })
         }
         .scrollIndicators(.automatic)
+        .onAppear { visibleTop = topItems }
+        .onHover { inside in
+            hoveringMenu = inside
+            if !inside && expanded == nil { visibleTop = topItems }
+        }
+        .onChange(of: topItems) { _, items in
+            // Keep names under the pointer (and an expanded row) stable during enrichment.
+            if !hoveringMenu && expanded == nil { visibleTop = items }
+            else {
+                visibleTop = visibleTop.compactMap { old in
+                    guard var current = day.items.first(where: { $0.id == old.id }) else { return nil }
+                    guard current.warnings(avoiding: settings.avoidedAllergens).isEmpty else { return nil }
+                    current.category = old.category
+                    return current
+                }
+            }
+        }
+        .onChange(of: expanded) { _, id in
+            if id == nil && !hoveringMenu { visibleTop = topItems }
+        }
+        .onChange(of: day.date) { filter = ""; visibleTop = topItems }
+        .onChange(of: settings.source?.key) { filter = ""; visibleTop = topItems }
     }
 
+    private var proteinGroup: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text("Top protein · \(settings.proteinRanking.heading)").scaledFont(.subheadline, weight: .semibold)
+                if nutritionLoading { ProgressView().controlSize(.mini).accessibilityLabel("Loading published nutrition") }
+                Spacer()
+            }.padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 4)
+            if visibleTop.isEmpty {
+                Text(nutritionLoading ? "Checking published nutrition…" : "Top choices ready").scaledFont(.caption1).foregroundStyle(.secondary)
+                    .padding(.horizontal, 16).frame(height: 44)
+            } else {
+                ForEach(visibleTop) { item in row(item, protein: settings.proteinRanking) }
+            }
+            Divider().padding(.top, 6)
+        }
+        .onHover { inside in
+            hoveringTop = inside
+            if !inside && !hoveringMenu && expanded == nil { visibleTop = topItems }
+        }
+    }
+
+    private func row(_ item: MenuItem, protein: ProteinRanking? = nil) -> some View {
+        MenuItemRow(item: item, warnings: item.warnings(avoiding: settings.avoidedAllergens),
+                    isFavorite: settings.isFavorite(item), isExpanded: expanded == item.id,
+                    toggleExpanded: { toggle(item) }, toggleFavorite: { settings.toggleFavorite(item) },
+                    proteinMode: protein, unknownAllergens: foodPro && !verifiedRecipes.contains(item.foodID))
+    }
     private func toggle(_ item: MenuItem) {
         let change = { expanded = expanded == item.id ? nil : item.id }
         if reduceMotion { change() } else { withAnimation(.snappy(duration: 0.2), change) }
@@ -63,6 +139,8 @@ struct MenuItemRow: View {
     let isExpanded: Bool
     let toggleExpanded: () -> Void
     let toggleFavorite: () -> Void
+    var proteinMode: ProteinRanking? = nil
+    var unknownAllergens = false
 
     @State private var isHovering = false
     @Environment(\.textScale) private var scale
@@ -79,9 +157,19 @@ struct MenuItemRow: View {
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
-                            summary
+                            if proteinMode != nil {
+                                Text([item.calories.map { "\($0) cal" }, item.category].compactMap { $0 }.joined(separator: " · "))
+                                    .scaledFont(.caption1).foregroundStyle(.secondary).multilineTextAlignment(.leading)
+                                if proteinMode == .per100Calories, let score = proteinMode?.score(item) {
+                                    Text(String(format: "%.1f g / 100 cal", score)).scaledFont(.caption1).foregroundStyle(.secondary)
+                                }
+                            } else { summary }
                         }
                         Spacer(minLength: 0)
+                        if proteinMode != nil, let protein = item.protein {
+                            Text(String(format: "%.1f g", protein))
+                                .scaledFont(.title3, weight: .semibold).monospacedDigit().foregroundStyle(.primary)
+                        }
                     }
                     .contentShape(Rectangle())
                 }
@@ -108,6 +196,10 @@ struct MenuItemRow: View {
             .padding(.vertical, 8)
 
             if isExpanded {
+                if unknownAllergens {
+                    Text("Allergens not checked yet. Check the published label before eating.")
+                        .scaledFont(.caption1).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 6)
+                }
                 ItemDetailView(item: item)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 12)
@@ -163,6 +255,7 @@ struct MenuItemRow: View {
 
     private var accessibilityLabel: String {
         var parts = [item.name]
+        if let protein = item.protein, proteinMode != nil { parts.append("\(protein) grams protein") }
         if let calories = item.calories { parts.append("\(calories) calories") }
         parts += item.dietaryTags
         if !warnings.isEmpty {

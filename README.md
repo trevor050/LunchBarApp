@@ -2,18 +2,23 @@
 
 A tiny Mac menu bar app that tells you what's for lunch. Click the fork and knife (or press ⌘⇧L) and today's school menu drops down. No browser, no tabs, no clicking through the Nutrislice site every single morning.
 
-I originally built it for my own high school's menu. It now works with any school, district or campus dining hall that publishes its menu on [Nutrislice](https://nutrislice.com).
+I originally built it for my own high school's menu. It now works with Nutrislice schools and Rutgers dining halls, including the older FoodPro menus. Rutgers’ current official menu links now go to Nutrislice too, so The Atrium is in the Rutgers current-menu picker.
 
 <p>
   <img src="docs/images/popover-dark.png" width="360" alt="LunchBar popover in dark mode showing Monday's lunch at Middlesex High: cheeseburger, hamburger, black bean burger, baked beans and spiral fries, with calories">
   <img src="docs/images/popover-allergens-light.png" width="360" alt="LunchBar popover in light mode for Auburn Elementary, with items containing milk flagged in orange and Halal, Vegan and Vegetarian tags">
 </p>
 
+<img src="docs/verification/rutgers-cold/rutgers-foodpro-04-Lunch-2026-11-10-dark.png" width="360" alt="Busch lunch: five highest-protein options with protein, calories and stations, followed by collapsed stations">
+
 ## What it does
 
 - Opens straight to today's menu. On weekends it jumps to Monday instead of showing you an empty Saturday.
 - ← and → browse days, T jumps back to today. Weekends are skipped unless you turn that off (dining halls that serve every day exist).
-- Switch between a school's menus (lunch, breakfast, the grill, whatever your cafeteria publishes) from the popover.
+- Save several places, then switch place or meal from the popover header. Your existing school is saved automatically.
+- Top protein shows up to five published choices, with grams, calories and station. Settings chooses grams per serving or protein per 100 calories. It works for either provider, and stays out of the way when protein isn’t published.
+- Large menus get a name filter and collapsible stations, collapsed by default above 25 items. Station choices are remembered.
+- Small ounce portions at explicitly ingredient/build-your-own stations are excluded from the ranking, while remaining in the full menu. Entree stations, EACH/SLICE servings and portions over 2 OZ remain eligible. [Exact rule and limits](docs/research/protein-ranking.md).
 - Click an item for calories, nutrition facts, ingredients and allergens, when your district publishes them.
 - Pick allergens to avoid and items that contain them get flagged. Vegan, vegetarian and halal tags show up when the district marks them.
 - Star a favorite and get a 7:30 AM notification on days it's served. (Chicken patty day deserves a heads up.)
@@ -21,7 +26,7 @@ I originally built it for my own high school's menu. It now works with any schoo
 - Holidays and days off come from your district's own calendar, so "Thanksgiving" shows up when your school says so.
 - Launch at login, a recordable global shortcut, text size options, light and dark mode, VoiceOver labels and full keyboard navigation.
 
-It uses essentially no CPU and about 12 MB of memory while idle (measured below), and it only talks to the network when you actually look at it.
+FoodPro only loads when you use the menu. Nutrislice can also check favorites in the background when you enable notifications.
 
 ## Install
 
@@ -67,6 +72,8 @@ Don't know your district's address? Find your school on [Nutrislice's lookup pag
 
 LunchBar can't search every district itself, because Nutrislice's own district search requires a CAPTCHA. Everything after the district name (schools, menu types, menus) comes from Nutrislice's public menu API.
 
+For Rutgers, choose **Add Place → Rutgers · current menus** in Settings to pick Busch, Livingston, Neilson or The Atrium. Choose **Rutgers · FoodPro** for the three verified older-portal halls. FoodPro’s Atrium ID could not be verified, so it isn’t guessed. Rutgers places browse weekends even if your old high school skips them.
+
 Upgrading from LunchBarApp 1.x? Your old `config.env` is imported automatically the first time 2.0 runs.
 
 ## How it gets the menu
@@ -86,9 +93,17 @@ It tries to be a polite guest:
 - There's no polling. With favorite notifications on, it checks once a day (at launch, on wake and at 6 AM), which usually hits the cache.
 - Requests identify themselves with a `LunchBar/2.0` user agent that links back here.
 
+### Rutgers FoodPro
+
+FoodPro serves HTML, not a supported API. Station headings become sections. A combined nutrition report supplies individual recipe nutrients, so LunchBar does not request a label for every item just to rank protein. Labels load on expansion; when you avoid an allergen, candidate labels load in ranking order until five eligible choices are known. Unknown labels do not enter that top group while an allergen is selected.
+
+FoodPro requests are serialized, spaced at least 350 ms apart, identify LunchBar and this repository, and back off on errors. There is no FoodPro timer or background fetch. Menus cache per hall/meal/date for an hour; recipe **and portion** nutrition caches for 30 days. Busch lunch on November 10 had 141 items: **3 requests on a cold open, 0 on a warm reopen**, measured with an empty app cache. Allergen checking and expanding labels add requests as needed. [Source investigation and fragility](docs/research/rutgers-foodpro.md), [label comparisons](docs/verification/rutgers-label-check.json).
+
+The observed date window was seven days. FoodPro can return menu HTML outside that window, including closed dates; LunchBar checks the published date dropdown and rejects that fallback. Hostnames, markup, form tokens and menu names can change without notice. This adapter can break when they do.
+
 ## Resource use
 
-Measured on a 2020 M1 MacBook Air running macOS 26.5, with the release build sitting idle in the menu bar after launch:
+Historical measurements of the Nutrislice-only 2.0 build, before the Rutgers adapter and HTML-parser dependency, on a 2020 M1 MacBook Air running macOS 26.5. These are not measurements of the current build:
 
 | Metric | Value | How |
 | --- | --- | --- |
@@ -107,13 +122,18 @@ swift run LunchBar       # run without bundling (login items and notifications a
 
 The code is split in two targets:
 
-- `Sources/LunchKit`: the Nutrislice client, JSON parsing, the disk cache, date math and link parsing. No UI, fully covered by tests in `Tests/LunchKitTests`, which run against recorded API responses from three districts in `Tests/LunchKitTests/Fixtures`.
+- `Sources/LunchKit`: provider interface, Nutrislice and Rutgers FoodPro clients/parsers, protein ranking, caches, date math and link parsing. No UI, tested in `Tests/LunchKitTests`, which run against recorded API responses from three districts in `Tests/LunchKitTests/Fixtures`.
 - `Sources/LunchBar`: the AppKit status item and popover, SwiftUI views, settings, global hotkey, login item and notifications.
 
 The README images come from the app's own snapshot mode, which renders the real popover with live data in light and dark mode:
 
 ```bash
-swift run LunchBar --render-snapshots /tmp/shots middlesex middlesex-high lunch 2026-11-16
+swift run LunchBar --render-snapshots docs/shots middlesex middlesex-high lunch 2026-11-10
+swift run LunchBar --render-snapshots docs/shots rutgers-foodpro 04 Lunch 2026-11-10 --protein-lean
+# Real hall/meal/day and saved-place matrix, plus Middlesex:
+swift run LunchBar --render-snapshots docs/matrix rutgers-foodpro 04 Lunch 2026-11-10 --matrix
+# Real status-item placement stress test (logs frames, no screen recording):
+dist/LunchBar.app/Contents/MacOS/LunchBar --self-test-popover 360 --right-edge
 ```
 
 Releases are built by GitHub Actions when a `v*` tag is pushed. CI builds and tests every pull request.
@@ -124,7 +144,7 @@ The release zip is ad-hoc signed only. Shipping it without the Gatekeeper prompt
 
 ## Disclaimer
 
-LunchBar is an unofficial tool. It isn't affiliated with, endorsed by, or supported by Nutrislice. Menus, nutrition and allergen information come straight from what your district publishes and can be wrong or change, so check with cafeteria staff if an allergy matters.
+LunchBar is an unofficial tool, not affiliated with Rutgers University or Nutrislice. Rutgers nutrition figures come from the university’s published labels and reports and **can be wrong**. Other schools’ figures come from their published Nutrislice data. Recipes, portions, availability and allergens can change, and cross-contact is possible. Check with dining staff when an allergy matters; a protein ranking is not a promise that a food is safe.
 
 ## License
 

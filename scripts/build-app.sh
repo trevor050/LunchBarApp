@@ -46,6 +46,7 @@ rm -rf "${APP}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "${BIN_DIR}/${PRODUCT}" "${APP}/Contents/MacOS/${PRODUCT}"
 cp Resources/AppIcon.icns "${APP}/Contents/Resources/AppIcon.icns"
+cp Resources/ThirdPartyNotices.txt "${APP}/Contents/Resources/ThirdPartyNotices.txt"
 
 cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -79,7 +80,7 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>MIT License. Not affiliated with Nutrislice.</string>
+    <string>MIT License. Not affiliated with Rutgers or Nutrislice.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 </dict>

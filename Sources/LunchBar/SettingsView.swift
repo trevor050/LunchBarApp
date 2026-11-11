@@ -12,6 +12,8 @@ struct SettingsView: View {
     let requestNotifications: () async -> Bool
 
     @State private var isChangingSchool = false
+    @State private var providerChoice = 0
+    @State private var rutgersHall = "04"
     @State private var notificationsDenied = false
 
     var body: some View {
@@ -37,7 +39,7 @@ struct SettingsView: View {
     private var schoolSection: some View {
         Section {
             if let source = settings.source, !isChangingSchool {
-                LabeledContent("School") {
+                LabeledContent("Place") {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(source.school.name)
                         Text(source.districtName ?? "\(source.district).nutrislice.com")
@@ -54,20 +56,60 @@ struct SettingsView: View {
                 } else {
                     LabeledContent("Menu", value: source.menuType.name)
                 }
-                Button("Change School…") {
+                if settings.savedPlaces.count > 1 {
+                    ForEach(settings.savedPlaces, id: \.placeKey) { place in
+                        HStack {
+                            Button(place.school.name + (place.provider == .rutgersFoodPro ? " · FoodPro" : "")) {
+                                settings.source = place; onSourceChange()
+                            }
+                            Spacer()
+                            Button("Remove") {
+                                if settings.source?.placeKey == place.placeKey {
+                                    settings.source = settings.savedPlaces.first { $0.placeKey != place.placeKey }
+                                }
+                                settings.savedPlaces.removeAll { $0.placeKey == place.placeKey }
+                                onSourceChange()
+                            }.buttonStyle(.borderless)
+                        }
+                    }
+                }
+                Button("Add Place…") {
                     finder.reset()
-                    finder.input = source.district
+                    finder.input = ""
                     isChangingSchool = true
-                    finder.search()
                 }
             } else {
-                schoolFinder
+                Picker("Source", selection: $providerChoice) {
+                    Text("Nutrislice school").tag(0)
+                    Text("Rutgers · current menus").tag(1)
+                    Text("Rutgers · FoodPro").tag(2)
+                }
+                .onChange(of: providerChoice) { _, choice in
+                    finder.reset()
+                    if choice == 1 { finder.input = "rutgers"; finder.search() }
+                }
+                if providerChoice == 2 {
+                    Picker("Dining hall", selection: $rutgersHall) {
+                        ForEach(RutgersLocations.foodPro) { hall in Text(hall.name).tag(hall.slug) }
+                    }
+                    Text("The Atrium is available under Rutgers’ current menus. FoodPro is the older portal.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button("Save Dining Hall") {
+                        guard let hall = RutgersLocations.foodPro.first(where: { $0.slug == rutgersHall }) else { return }
+                        settings.source = RutgersLocations.source(hall: hall)
+                        isChangingSchool = false
+                        onSourceChange()
+                    }
+                    if settings.source != nil { Button("Cancel") { isChangingSchool = false } }
+                } else {
+                    schoolFinder
+                }
             }
         } header: {
-            Text("School")
+            Text("Saved places")
         } footer: {
             if settings.source == nil {
-                Text("LunchBar shows the menu from any school or campus that uses Nutrislice.")
+                Text("Save Nutrislice schools or Rutgers dining halls, then switch from the popover header.")
                     .foregroundStyle(.secondary)
             }
         }
@@ -75,6 +117,7 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var schoolFinder: some View {
+        if providerChoice == 0 {
         HStack {
             TextField("District", text: $finder.input, prompt: Text("middlesex, or paste a menu link"))
                 .onSubmit { finder.search() }
@@ -88,6 +131,8 @@ struct SettingsView: View {
             Link("Don't know it? Look up your school on Nutrislice", destination: SchoolFinder.lookupURL)
         }
         .font(.callout)
+
+        }
 
         switch finder.phase {
         case .idle:
@@ -133,7 +178,7 @@ struct SettingsView: View {
         }
         HStack {
             Spacer()
-            Button("Use This School") {
+            Button("Save This Place") {
                 guard let selection = finder.selection else { return }
                 settings.source = selection
                 isChangingSchool = false
@@ -205,6 +250,9 @@ struct SettingsView: View {
             }
 
             Toggle("Skip weekends", isOn: $settings.skipWeekends)
+            Picker("Top protein ranking", selection: $settings.proteinRanking) {
+                ForEach(ProteinRanking.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
+            }
             Picker("Text size", selection: $settings.textSize) {
                 ForEach(TextSize.allCases) { size in
                     Text(size.title).tag(size)
@@ -231,7 +279,7 @@ struct SettingsView: View {
         } header: {
             Text("Flag items containing")
         } footer: {
-            Text("Based on what your district publishes. Always double-check with cafeteria staff.")
+            Text("Based on the published menu. Always double-check with dining staff.")
                 .foregroundStyle(.secondary)
         }
     }
@@ -291,7 +339,7 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section {
             LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev")
-            Text("Unofficial. Not affiliated with Nutrislice. Menus are fetched from Nutrislice's public pages and may change.")
+            Text("Unofficial. Not affiliated with Rutgers or Nutrislice. Published nutrition and allergen information can be wrong; check with dining staff.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Link("Source code on GitHub", destination: URL(string: "https://github.com/trevor050/LunchBarApp")!)

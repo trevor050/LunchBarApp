@@ -68,11 +68,13 @@ public struct MenuItem: Codable, Hashable, Sendable, Identifiable {
     /// MyPlate food groups ("Grain", "Protein").
     public var foodGroups: [String]
     public var nutrition: [Nutrient]
+    /// Provider form token; not part of the shared food identity.
+    public var providerReference: String?
 
     public init(
         id: String, foodID: String, name: String, description: String? = nil, imageURL: URL? = nil,
         category: String? = nil, calories: Int? = nil, servingSize: String? = nil, ingredients: String? = nil,
-        allergens: [String] = [], dietaryTags: [String] = [], foodGroups: [String] = [], nutrition: [Nutrient] = []
+        allergens: [String] = [], dietaryTags: [String] = [], foodGroups: [String] = [], nutrition: [Nutrient] = [], providerReference: String? = nil
     ) {
         self.id = id
         self.foodID = foodID
@@ -87,6 +89,7 @@ public struct MenuItem: Codable, Hashable, Sendable, Identifiable {
         self.dietaryTags = dietaryTags
         self.foodGroups = foodGroups
         self.nutrition = nutrition
+        self.providerReference = providerReference
     }
 }
 

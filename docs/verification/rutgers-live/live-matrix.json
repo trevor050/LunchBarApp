@@ -1,0 +1,570 @@
+{
+  "failures" : 0,
+  "records" : [
+    {
+      "date" : "2026-11-11",
+      "hall" : "Livingston Dining Commons",
+      "items" : 66,
+      "meal" : "Lunch",
+      "nutritionNotice" : "",
+      "stations" : 8,
+      "top" : [
+        {
+          "calories" : 378,
+          "name" : "BEEF AND BROCCOLI",
+          "protein" : 38.140000000000001,
+          "recipe" : "019815*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 204,
+          "name" : "INDIAN CURRY CHICKEN",
+          "protein" : 31.178999999999998,
+          "recipe" : "111180*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 181,
+          "name" : "CHICKEN THIGH WITH CAJUN SAUCE",
+          "protein" : 26.986000000000001,
+          "recipe" : "111042*1",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 273,
+          "name" : "BREADED CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111051*1",
+          "station" : "PUB"
+        },
+        {
+          "calories" : 273,
+          "name" : "SPICY CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111052*1",
+          "station" : "PUB"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-12",
+      "hall" : "Livingston Dining Commons",
+      "items" : 50,
+      "meal" : "Lunch",
+      "nutritionNotice" : "",
+      "stations" : 9,
+      "top" : [
+        {
+          "calories" : 273,
+          "name" : "BREADED CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111051*1",
+          "station" : "PUB"
+        },
+        {
+          "calories" : 273,
+          "name" : "SPICY CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111052*1",
+          "station" : "PUB"
+        },
+        {
+          "calories" : 142,
+          "name" : "GRILLED CHICKEN BREAST 4OZ",
+          "protein" : 25.382999999999999,
+          "recipe" : "111241*4",
+          "station" : "GRILL STATION"
+        },
+        {
+          "calories" : 180,
+          "name" : "TEXAS CHILI",
+          "protein" : 21.626000000000001,
+          "recipe" : "019887*6",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 136,
+          "name" : "TURKEY BURGER",
+          "protein" : 16.056999999999999,
+          "recipe" : "111093*1",
+          "station" : "PUB"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-11",
+      "hall" : "Livingston Dining Commons",
+      "items" : 66,
+      "meal" : "Dinner",
+      "nutritionNotice" : "",
+      "stations" : 8,
+      "top" : [
+        {
+          "calories" : 378,
+          "name" : "BEEF AND BROCCOLI",
+          "protein" : 38.140000000000001,
+          "recipe" : "019815*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 204,
+          "name" : "INDIAN CURRY CHICKEN",
+          "protein" : 31.178999999999998,
+          "recipe" : "111180*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 197,
+          "name" : "CHICKEN MARSALA WITH MUSHROOMS",
+          "protein" : 28.18,
+          "recipe" : "111355*4",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 273,
+          "name" : "BREADED CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111051*1",
+          "station" : "PUB"
+        },
+        {
+          "calories" : 273,
+          "name" : "SPICY CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111052*1",
+          "station" : "PUB"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-12",
+      "hall" : "Livingston Dining Commons",
+      "items" : 55,
+      "meal" : "Dinner",
+      "nutritionNotice" : "",
+      "stations" : 9,
+      "top" : [
+        {
+          "calories" : 1871,
+          "name" : "FRIED WINGS",
+          "protein" : 110.86,
+          "recipe" : "111130*21",
+          "station" : "COOK TO ORDER BAR"
+        },
+        {
+          "calories" : 273,
+          "name" : "BREADED CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111051*1",
+          "station" : "PUB"
+        },
+        {
+          "calories" : 273,
+          "name" : "SPICY CHICKEN CUTLET",
+          "protein" : 26.324000000000002,
+          "recipe" : "111052*1",
+          "station" : "PUB"
+        },
+        {
+          "calories" : 142,
+          "name" : "GRILLED CHICKEN BREAST 4OZ",
+          "protein" : 25.382999999999999,
+          "recipe" : "111241*4",
+          "station" : "GRILL STATION"
+        },
+        {
+          "calories" : 118,
+          "name" : "THAI INSPIRED GOLDEN CURRY SHRIMP",
+          "protein" : 22.125,
+          "recipe" : "170246*4",
+          "station" : "ROTISSERIE"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-11",
+      "hall" : "Busch Dining Hall",
+      "items" : 143,
+      "meal" : "Lunch",
+      "nutritionNotice" : "",
+      "stations" : 12,
+      "top" : [
+        {
+          "calories" : 1087,
+          "name" : "MEATBALL SUB KNIGHT ROOM",
+          "protein" : 41.784999999999997,
+          "recipe" : "500153*1",
+          "station" : "LUNCH TAKEOUT"
+        },
+        {
+          "calories" : 774,
+          "name" : "CHICKEN CAESAR WRAP",
+          "protein" : 40.307000000000002,
+          "recipe" : "600929*1",
+          "station" : "LUNCH TAKEOUT"
+        },
+        {
+          "calories" : 286,
+          "name" : "LAMB CURRY",
+          "protein" : 38.131,
+          "recipe" : "195022*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 681,
+          "name" : "SPICY CHICKEN FLATBREAD SANDWICH",
+          "protein" : 35.158000000000001,
+          "recipe" : "705228*1",
+          "station" : "LUNCH TAKEOUT"
+        },
+        {
+          "calories" : 287,
+          "name" : "ROTISSERIE MOROCCAN CHICKEN",
+          "protein" : 28.135000000000002,
+          "recipe" : "111021*6",
+          "station" : "ROTISSERIE"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-12",
+      "hall" : "Busch Dining Hall",
+      "items" : 134,
+      "meal" : "Lunch",
+      "nutritionNotice" : "",
+      "stations" : 12,
+      "top" : [
+        {
+          "calories" : 419,
+          "name" : "TURKEY & PROVOLONE ON KAISER",
+          "protein" : 42.767000000000003,
+          "recipe" : "600903*1",
+          "station" : "LUNCH TAKEOUT"
+        },
+        {
+          "calories" : 774,
+          "name" : "CHICKEN CAESAR WRAP",
+          "protein" : 40.307000000000002,
+          "recipe" : "600929*1",
+          "station" : "LUNCH TAKEOUT"
+        },
+        {
+          "calories" : 336,
+          "name" : "SHREDDED PORK",
+          "protein" : 36.968000000000004,
+          "recipe" : "250004*4",
+          "station" : "CANTINA"
+        },
+        {
+          "calories" : 232,
+          "name" : "TANDOORI CHICKEN",
+          "protein" : 35.686,
+          "recipe" : "111178*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 681,
+          "name" : "SPICY CHICKEN FLATBREAD SANDWICH",
+          "protein" : 35.158000000000001,
+          "recipe" : "705228*1",
+          "station" : "LUNCH TAKEOUT"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-11",
+      "hall" : "Busch Dining Hall",
+      "items" : 123,
+      "meal" : "Dinner",
+      "nutritionNotice" : "",
+      "stations" : 11,
+      "top" : [
+        {
+          "calories" : 286,
+          "name" : "LAMB CURRY",
+          "protein" : 38.131,
+          "recipe" : "195022*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 197,
+          "name" : "CHICKEN MARSALA WITH MUSHROOMS",
+          "protein" : 28.18,
+          "recipe" : "111355*4",
+          "station" : "ENTREES"
+        },
+        {
+          "calories" : 287,
+          "name" : "ROTISSERIE MOROCCAN CHICKEN",
+          "protein" : 28.135000000000002,
+          "recipe" : "111021*6",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 221,
+          "name" : "SZECHUAN BEEF",
+          "protein" : 27.385999999999999,
+          "recipe" : "019825*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 156,
+          "name" : "GRILLED CHICKEN MONTREAL",
+          "protein" : 25.311,
+          "recipe" : "111319*1",
+          "station" : "PIZZA & PASTA"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-12",
+      "hall" : "Busch Dining Hall",
+      "items" : 119,
+      "meal" : "Dinner",
+      "nutritionNotice" : "",
+      "stations" : 11,
+      "top" : [
+        {
+          "calories" : 336,
+          "name" : "SHREDDED PORK",
+          "protein" : 36.968000000000004,
+          "recipe" : "250004*4",
+          "station" : "CANTINA"
+        },
+        {
+          "calories" : 232,
+          "name" : "TANDOORI CHICKEN",
+          "protein" : 35.686,
+          "recipe" : "111178*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 273,
+          "name" : "ROTISSERIE CHICKEN W\/ GINGER, LIME, & HONEY",
+          "protein" : 30.524999999999999,
+          "recipe" : "111271*6",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 156,
+          "name" : "GRILLED CHICKEN MONTREAL",
+          "protein" : 25.311,
+          "recipe" : "111319*1",
+          "station" : "PIZZA & PASTA"
+        },
+        {
+          "calories" : 222,
+          "name" : "CHICKEN HUNAN STYLE",
+          "protein" : 24.927,
+          "recipe" : "520013*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-11",
+      "hall" : "Neilson Dining Hall",
+      "items" : 70,
+      "meal" : "Lunch",
+      "nutritionNotice" : "",
+      "stations" : 9,
+      "top" : [
+        {
+          "calories" : 1876,
+          "name" : "MOC BAKED CHICKEN WINGS",
+          "protein" : 113.029,
+          "recipe" : "705137*10",
+          "station" : "ENTREES"
+        },
+        {
+          "calories" : 668,
+          "name" : "ROTISSERIE DUCK",
+          "protein" : 35.453000000000003,
+          "recipe" : "111300*8",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 221,
+          "name" : "SZECHUAN BEEF",
+          "protein" : 27.385999999999999,
+          "recipe" : "019825*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 156,
+          "name" : "GRILLED CHICKEN MONTREAL",
+          "protein" : 25.311,
+          "recipe" : "111319*1",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 272,
+          "name" : "SWEET ITALIAN PORK SAUSAGE",
+          "protein" : 18.143999999999998,
+          "recipe" : "140187*4",
+          "station" : "ENTREES"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-12",
+      "hall" : "Neilson Dining Hall",
+      "items" : 69,
+      "meal" : "Lunch",
+      "nutritionNotice" : "",
+      "stations" : 9,
+      "top" : [
+        {
+          "calories" : 333,
+          "name" : "BAKED FLOUNDER",
+          "protein" : 39.459000000000003,
+          "recipe" : "170114*6",
+          "station" : "ENTREES"
+        },
+        {
+          "calories" : 262,
+          "name" : "BBQ CHICKEN",
+          "protein" : 32.996000000000002,
+          "recipe" : "111154*6",
+          "station" : "ENTREES"
+        },
+        {
+          "calories" : 156,
+          "name" : "GRILLED CHICKEN MONTREAL",
+          "protein" : 25.311,
+          "recipe" : "111319*1",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 222,
+          "name" : "CHICKEN HUNAN STYLE",
+          "protein" : 24.927,
+          "recipe" : "520013*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 199,
+          "name" : "ROTISSERIE CHICKEN",
+          "protein" : 23.753,
+          "recipe" : "111059*4",
+          "station" : "ROTISSERIE"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-11",
+      "hall" : "Neilson Dining Hall",
+      "items" : 57,
+      "meal" : "Dinner",
+      "nutritionNotice" : "",
+      "stations" : 9,
+      "top" : [
+        {
+          "calories" : 668,
+          "name" : "ROTISSERIE DUCK",
+          "protein" : 35.453000000000003,
+          "recipe" : "111300*8",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 197,
+          "name" : "CHICKEN MARSALA WITH MUSHROOMS",
+          "protein" : 28.18,
+          "recipe" : "111355*4",
+          "station" : "ENTREES"
+        },
+        {
+          "calories" : 221,
+          "name" : "SZECHUAN BEEF",
+          "protein" : 27.385999999999999,
+          "recipe" : "019825*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 156,
+          "name" : "GRILLED CHICKEN MONTREAL",
+          "protein" : 25.311,
+          "recipe" : "111319*1",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 248,
+          "name" : "ROASTED PORK LOIN",
+          "protein" : 24.888999999999999,
+          "recipe" : "195014*3",
+          "station" : "COOK TO ORDER BAR"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-12",
+      "hall" : "Neilson Dining Hall",
+      "items" : 57,
+      "meal" : "Dinner",
+      "nutritionNotice" : "",
+      "stations" : 9,
+      "top" : [
+        {
+          "calories" : 156,
+          "name" : "GRILLED CHICKEN MONTREAL",
+          "protein" : 25.311,
+          "recipe" : "111319*1",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 222,
+          "name" : "CHICKEN HUNAN STYLE",
+          "protein" : 24.927,
+          "recipe" : "520013*6",
+          "station" : "ASIAN INSPIRED CUISINE"
+        },
+        {
+          "calories" : 199,
+          "name" : "ROTISSERIE CHICKEN",
+          "protein" : 23.753,
+          "recipe" : "111059*4",
+          "station" : "ROTISSERIE"
+        },
+        {
+          "calories" : 221,
+          "name" : "PULLED PORK TACO MEAT",
+          "protein" : 22.715,
+          "recipe" : "195080*3",
+          "station" : "CANTINA"
+        },
+        {
+          "calories" : 118,
+          "name" : "THAI INSPIRED GOLDEN CURRY SHRIMP",
+          "protein" : 22.125,
+          "recipe" : "170246*4",
+          "station" : "ENTREES"
+        }
+      ],
+      "warmRequests" : 0
+    },
+    {
+      "date" : "2026-11-11",
+      "hall" : "Middlesex High",
+      "items" : 2,
+      "topCount" : 2
+    }
+  ],
+  "requests" : 27,
+  "savedPlaces" : [
+    "rutgersFoodPro\/rutgers\/04",
+    "rutgersFoodPro\/rutgers\/03",
+    "rutgersFoodPro\/rutgers\/05",
+    "nutrislice\/middlesex\/middlesex-high"
+  ]
+}

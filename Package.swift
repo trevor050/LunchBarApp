@@ -10,14 +10,16 @@ let package = Package(
         .executable(name: "LunchBar", targets: ["LunchBar"]),
         .library(name: "LunchKit", targets: ["LunchKit"])
     ],
+    dependencies: [.package(url: "https://github.com/scinfu/SwiftSoup.git", exact: "2.14.3")],
     targets: [
         // Networking, parsing, caching and date logic. No AppKit or SwiftUI.
-        .target(name: "LunchKit"),
+        .target(name: "LunchKit", dependencies: [.product(name: "SwiftSoup", package: "SwiftSoup")]),
         // The menu bar app itself.
         .executableTarget(
             name: "LunchBar",
             dependencies: ["LunchKit"]
         ),
+        .testTarget(name: "LunchBarTests", dependencies: ["LunchBar"]),
         .testTarget(
             name: "LunchKitTests",
             dependencies: ["LunchKit"],

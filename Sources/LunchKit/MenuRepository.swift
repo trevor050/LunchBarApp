@@ -19,6 +19,7 @@ public struct WeekResult: Sendable, Equatable {
 /// - Concurrent requests for the same week share one network call.
 public actor MenuRepository {
     public let client: NutrisliceClient
+    public let foodPro: RutgersFoodPro
     public let cache: MenuCache
     public let maxAge: TimeInterval
     private let now: @Sendable () -> Date
@@ -27,9 +28,11 @@ public actor MenuRepository {
     public init(
         client: NutrisliceClient,
         cache: MenuCache,
+        foodPro: RutgersFoodPro = RutgersFoodPro(),
         maxAge: TimeInterval = 60 * 60,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
+        self.foodPro = foodPro
         self.client = client
         self.cache = cache
         self.maxAge = maxAge
@@ -38,11 +41,11 @@ public actor MenuRepository {
 
     /// Cached copy only; never touches the network. Used to paint instantly.
     public func cachedWeek(source: MenuSource, containing day: LocalDate) async -> CachedWeek? {
-        await cache.week(for: MenuCache.key(source: source, weekStart: day.weekStart))
+        await cache.week(for: Self.key(source: source, day: day))
     }
 
     public func week(source: MenuSource, containing day: LocalDate, forceRefresh: Bool = false) async throws(NutrisliceError) -> WeekResult {
-        let key = MenuCache.key(source: source, weekStart: day.weekStart)
+        let key = Self.key(source: source, day: day)
         let cached = await cache.week(for: key)
 
         if !forceRefresh, let cached, cached.isFresh(now: now(), maxAge: maxAge) {
@@ -61,15 +64,19 @@ public actor MenuRepository {
         }
     }
 
+    private static func key(source: MenuSource, day: LocalDate) -> String {
+        MenuCache.key(source: source, weekStart: source.provider == .rutgersFoodPro ? day : day.weekStart)
+    }
+
     private func download(source: MenuSource, day: LocalDate, key: String) async throws -> CachedWeek {
         if let existing = inFlight[key] {
             return try await existing.value
         }
-        let client = client
+        let provider: any MenuProviding = source.provider == .rutgersFoodPro ? foodPro : client
         let cache = cache
         let now = now
         let task = Task<CachedWeek, any Error> {
-            let week = try await client.week(source: source, containing: day)
+            let week = try await provider.week(source: source, containing: day)
             let cached = CachedWeek(week: week, fetchedAt: now())
             await cache.store(cached, for: key)
             return cached

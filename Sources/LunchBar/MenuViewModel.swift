@@ -26,15 +26,22 @@ final class MenuViewModel {
     /// Set when showing a saved copy because the refresh failed.
     private(set) var staleNotice: String?
     private(set) var isRefreshing = false
+    private(set) var nutritionLoading = false
+    private(set) var nutritionNotice: String?
+    private(set) var verifiedRecipes: Set<String> = []
+    @ObservationIgnored private var nutritionTask: Task<Void, Never>?
     private(set) var week: MenuWeek?
     /// The item whose details are expanded in the list.
     var expandedItemID: String?
+    var menuFilter = ""
 
     @ObservationIgnored let settings: AppSettings
     @ObservationIgnored let repository: MenuRepository
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private var loadGeneration = 0
+    @ObservationIgnored private var nutritionGeneration = 0
     @ObservationIgnored private var lastOpenedToday: LocalDate?
+    @ObservationIgnored private var metadataRequested: Set<String> = []
     @ObservationIgnored var onWeekLoaded: ((MenuSource, MenuWeek) -> Void)?
 
     init(settings: AppSettings, repository: MenuRepository, now: @escaping () -> Date = Date.init) {
@@ -46,7 +53,7 @@ final class MenuViewModel {
         self.day = DayNavigator(skipWeekends: settings.skipWeekends).initialDay(today: today)
     }
 
-    var navigator: DayNavigator { DayNavigator(skipWeekends: settings.skipWeekends) }
+    var navigator: DayNavigator { DayNavigator(skipWeekends: source?.provider == .rutgersFoodPro || source?.district == "rutgers" ? false : settings.skipWeekends) }
     var source: MenuSource? { settings.source }
     var isShowingDefaultDay: Bool { day == navigator.initialDay(today: today) }
 
@@ -66,6 +73,18 @@ final class MenuViewModel {
             day = navigator.initialDay(today: today)
         }
         load()
+        restoreMenuTypesIfNeeded()
+    }
+
+    private func restoreMenuTypesIfNeeded() {
+        guard let source, source.provider == .nutrislice, source.school.menuTypes.isEmpty,
+              metadataRequested.insert(source.placeKey).inserted else { return }
+        Task {
+            guard let school = try? await repository.client.schools(district: source.district).first(where: { $0.slug == source.school.slug }),
+                  var selected = settings.source, selected.placeKey == source.placeKey else { return }
+            selected.school = school
+            settings.source = selected
+        }
     }
 
     func showNext() { move(by: 1) }
@@ -79,6 +98,7 @@ final class MenuViewModel {
     func go(to date: LocalDate) {
         guard date != day else { return }
         day = date
+        menuFilter = ""
         expandedItemID = nil
         load()
     }
@@ -92,10 +112,27 @@ final class MenuViewModel {
         sourceDidChange()
     }
 
+    func select(place: MenuSource) {
+        settings.source = place
+        expandedItemID = nil
+        sourceDidChange()
+    }
+
+    var topProteinItems: [MenuItem] {
+        guard case .menu(var day) = phase else { return [] }
+        if source?.provider == .rutgersFoodPro && !settings.avoidedAllergens.isEmpty {
+            for i in day.sections.indices { day.sections[i].items.removeAll { !verifiedRecipes.contains($0.foodID) } }
+        }
+        return settings.proteinRanking.top(in: day, avoiding: settings.avoidedAllergens)
+    }
+
     func sourceDidChange() {
+        menuFilter = ""
+        expandedItemID = nil
         week = nil
         staleNotice = nil
         load()
+        restoreMenuTypesIfNeeded()
     }
 
     private func move(by count: Int) {
@@ -105,21 +142,27 @@ final class MenuViewModel {
     // MARK: Loading
 
     func load(force: Bool = false) {
+        nutritionTask?.cancel()
+        nutritionLoading = false
+        nutritionNotice = nil
+        verifiedRecipes = []
         loadGeneration += 1
         let generation = loadGeneration
         guard let source = settings.source else {
             phase = .needsSetup
+            isRefreshing = false
             return
         }
         let day = day
 
         // Paint instantly from the week already in memory when we can.
-        if let week, week.start == day.weekStart {
+        if let week, week.day(day) != nil {
             apply(week, source: source)
-        }
+        } else { phase = .loading }
+        isRefreshing = true
 
         Task {
-            var painted = self.week?.start == day.weekStart
+            var painted = self.week?.day(day) != nil
             if !painted, let cached = await repository.cachedWeek(source: source, containing: day) {
                 guard generation == loadGeneration else { return }
                 self.week = cached.week
@@ -138,10 +181,72 @@ final class MenuViewModel {
                 staleNotice = result.refreshError.map { Self.staleMessage(for: $0, savedAt: result.fetchedAt) }
                 apply(result.week, source: source)
                 onWeekLoaded?(source, result.week)
+                loadNutrition()
             } catch {
                 guard generation == loadGeneration else { return }
                 staleNotice = nil
                 if !painted { phase = .failed(error) } else { staleNotice = Self.staleMessage(for: error, savedAt: nil) }
+            }
+        }
+    }
+
+    func loadNutrition() {
+        nutritionTask?.cancel()
+        nutritionGeneration += 1
+        let nutritionID = nutritionGeneration
+        guard let source, source.provider == .rutgersFoodPro, case .menu(let initial) = phase else { return }
+        let generation = loadGeneration
+        nutritionLoading = true
+        nutritionNotice = nil
+        nutritionTask = Task {
+            defer { if generation == loadGeneration && nutritionID == nutritionGeneration { nutritionLoading = false } }
+            do {
+                var enriched = try await repository.foodPro.enriched(initial, source: source)
+                guard !Task.isCancelled, generation == loadGeneration else { return }
+                for item in enriched.items where await repository.foodPro.hasLabel(item.foodID) {
+                    verifiedRecipes.insert(item.foodID)
+                }
+                guard !Task.isCancelled, generation == loadGeneration, nutritionID == nutritionGeneration else { return }
+                phase = .menu(enriched)
+                if !settings.avoidedAllergens.isEmpty {
+                    // Report has no allergens: check labels in ranking order until
+                    // five safe choices are known. Unknown labels never enter Top protein.
+                    for candidate in settings.proteinRanking.top(in: enriched, avoiding: [], limit: enriched.items.count) {
+                        guard !Task.isCancelled, generation == loadGeneration else { return }
+                        _ = try await repository.foodPro.details(candidate, source: source, day: enriched.date)
+                        guard !Task.isCancelled, generation == loadGeneration else { return }
+                        verifiedRecipes.insert(candidate.foodID)
+                        enriched = await repository.foodPro.applyingCached(to: enriched)
+                        guard !Task.isCancelled, generation == loadGeneration, nutritionID == nutritionGeneration else { return }
+                        phase = .menu(enriched)
+                        if topProteinItems.count >= 5 { break }
+                    }
+                }
+            } catch {
+                guard !Task.isCancelled, generation == loadGeneration else { return }
+                if ProcessInfo.processInfo.arguments.contains("--http-diagnostics") {
+                    FileHandle.standardError.write(Data("Nutrition error: \(error)\n".utf8))
+                }
+                nutritionNotice = "Some nutrition could not load. Reopen the menu to try again."
+            }
+        }
+    }
+
+    func loadDetails(_ id: String?) {
+        guard let id, let source, source.provider == .rutgersFoodPro,
+              case .menu(let current) = phase, let item = current.items.first(where: { $0.id == id }) else { return }
+        let generation = loadGeneration
+        Task {
+            do {
+                _ = try await repository.foodPro.details(item, source: source, day: current.date)
+                guard generation == loadGeneration, case .menu(let displayed) = phase else { return }
+                verifiedRecipes.insert(item.foodID)
+                let updated = await repository.foodPro.applyingCached(to: displayed)
+                guard generation == loadGeneration else { return }
+                phase = .menu(updated)
+            } catch {
+                guard generation == loadGeneration else { return }
+                nutritionNotice = "Couldn’t load this label. Try again after a short wait."
             }
         }
     }

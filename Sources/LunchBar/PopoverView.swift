@@ -74,42 +74,35 @@ struct PopoverView: View {
     @ViewBuilder
     private var sourceMenu: some View {
         if let source = model.source {
-            let types = source.school.menuTypes
-            if types.count > 1 {
-                Menu {
-                    ForEach(types) { type in
-                        Button {
-                            model.select(menuType: type)
-                        } label: {
-                            if type == source.menuType {
-                                Label(type.name, systemImage: "checkmark")
-                            } else {
-                                Text(type.name)
-                            }
+            Menu {
+                Section("Saved places") {
+                    ForEach(model.settings.savedPlaces, id: \.placeKey) { place in
+                        Button { model.select(place: place) } label: {
+                            if place.placeKey == source.placeKey {
+                                Label(place.school.name + (place.provider == .rutgersFoodPro ? " · FoodPro" : place.district == "rutgers" ? " · Current" : ""), systemImage: "checkmark")
+                            } else { Text(place.school.name + (place.provider == .rutgersFoodPro ? " · FoodPro" : place.district == "rutgers" ? " · Current" : "")) }
                         }
                     }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text("\(source.school.name) · \(source.menuType.name)")
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
-                    }
-                    .scaledFont(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .contentShape(Rectangle())
+                    Button("Add Place…", action: openSettings)
                 }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .accessibilityLabel("\(source.school.name), \(source.menuType.name) menu")
-                .accessibilityHint("Switch between this school's menus")
-            } else {
-                Text("\(source.school.name) · \(source.menuType.name)")
-                    .scaledFont(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                Section("Meal") {
+                    ForEach(source.school.menuTypes) { type in
+                        Button { model.select(menuType: type) } label: {
+                            if type == source.menuType { Label(type.name, systemImage: "checkmark") }
+                            else { Text(type.name) }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Text("\(source.school.name) · \(source.menuType.name)").lineLimit(1).truncationMode(.middle)
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                }
+                .scaledFont(.subheadline).foregroundStyle(.secondary)
             }
+            .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+            .help("\(source.school.name) · \(source.menuType.name), switch saved place or meal")
+            .accessibilityLabel("\(source.school.name), \(source.menuType.name), switch place or meal")
         }
     }
 
@@ -139,9 +132,9 @@ struct PopoverView: View {
         case .needsSetup:
             StateMessage(
                 symbol: "fork.knife",
-                title: "Pick your school",
-                message: "LunchBar works with any school or campus that publishes its menu on Nutrislice.",
-                actionTitle: "Choose School…",
+                title: "Save a place",
+                message: "Save a Nutrislice school or Rutgers dining hall to see its menu.",
+                actionTitle: "Save a Place…",
                 action: openSettings
             )
         case .loading:
@@ -149,7 +142,12 @@ struct PopoverView: View {
                 .controlSize(.small)
                 .accessibilityLabel("Loading menu")
         case .menu(let day):
-            MenuListView(day: day, settings: model.settings, expanded: $model.expandedItemID)
+            MenuListView(day: day, settings: model.settings, expanded: $model.expandedItemID,
+                         topItems: model.topProteinItems, nutritionLoading: model.nutritionLoading,
+                         nutritionNotice: model.nutritionNotice, verifiedRecipes: model.verifiedRecipes, filter: $model.menuFilter)
+                .onChange(of: model.expandedItemID) { _, id in model.loadDetails(id) }
+                .onChange(of: model.settings.proteinRanking) { model.loadNutrition() }
+                .onChange(of: model.settings.avoidedAllergens) { model.loadNutrition() }
         case .empty(let reason):
             emptyState(reason)
         case .failed(let error):
@@ -188,8 +186,10 @@ struct PopoverView: View {
             StateMessage(symbol: "questionmark.folder", title: "Menu not found",
                          message: error.message, actionTitle: "Open Settings", action: openSettings)
         case .timedOut, .server, .invalidData:
-            StateMessage(symbol: "exclamationmark.icloud", title: "Nutrislice isn't responding",
-                         message: "\(error.message) Try again in a bit.",
+            StateMessage(symbol: "exclamationmark.icloud", title: "Menu provider isn’t responding",
+                         message: model.source?.provider == .rutgersFoodPro
+                            ? "Rutgers’ published menu could not be read. Try again after a short wait."
+                            : "\(error.message) Try again in a bit.",
                          actionTitle: "Try Again", action: model.refresh)
         }
     }
@@ -214,7 +214,7 @@ struct PopoverView: View {
                 Button("Refresh") { model.refresh() }
                     .keyboardShortcut("r")
                 if let url = model.source?.webURL(on: model.day) {
-                    Button("Open on Nutrislice") { NSWorkspace.shared.open(url) }
+                    Button("Open Published Menu") { NSWorkspace.shared.open(url) }
                 }
                 Divider()
                 Button("Settings…", action: openSettings)

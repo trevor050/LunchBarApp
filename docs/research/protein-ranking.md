@@ -1,0 +1,9 @@
+# Top protein ranking rules
+
+Only published, finite, positive protein values in grams qualify. Missing values stay missing. Per-serving mode sorts by grams; lean mode sorts by grams × 100 / published calories and requires positive calories. Ties sort by item name then stable entry ID. Recipe/portion repeats across stations appear once, using that deterministic station choice. Five rows are shown at most.
+
+The ingredient exclusion is deliberately narrow: **a portion of at most 2 OZ**, at a station explicitly named Condiment, Topping, Cook to order, Build your own, Omelet/Omelette, Noodle bar, Salad bar or Cantina sides. Fractions are understood. EACH and SLICE servings, larger ounce portions, unknown serving sizes, ordinary Entrees and Deli stations remain eligible. The rule never removes an item from the full menu. A 6 OZ chicken portion at Toppings, a 1 EACH entree at Cook to order and a 2 OZ entree at Entrees all remain eligible in tests. Station labels and portions can still be wrong, so this is a conservative heuristic, not a classifier of what constitutes a meal.
+
+Selected allergen warnings exclude an item from the top group, including precautionary warnings. FoodPro reports have no allergens, so when an allergen is selected, labels are checked in ranking order until five eligible choices are known. Unknown or failed labels do not qualify. Other items remain in the full menu; loaded allergen warnings appear there, and unverified label details are explicitly marked.
+
+During FoodPro nutrition loading, a quiet pending group appears. New ranking order is deferred while the pointer is in the menu or an item is expanded; existing rows receive updated details without reordering. Newly confirmed allergen conflicts are removed immediately. Leaving the menu applies the current ranking. Nutrition values are never invented for placeholders.

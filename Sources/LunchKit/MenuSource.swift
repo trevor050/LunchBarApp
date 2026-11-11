@@ -2,13 +2,18 @@ import Foundation
 
 /// Everything needed to fetch one menu: a district, one of its schools, and a menu type.
 public struct MenuSource: Codable, Hashable, Sendable {
+    public var provider: MenuProviderKind { providerKind ?? .nutrislice }
+    private var providerKind: MenuProviderKind?
+    public var placeKey: String { "\(provider.rawValue)/\(district)/\(school.slug)" }
+
     /// The district's Nutrislice subdomain, e.g. `middlesex` for `middlesex.nutrislice.com`.
     public var district: String
     public var districtName: String?
     public var school: School
     public var menuType: MenuType
 
-    public init(district: String, districtName: String? = nil, school: School, menuType: MenuType) {
+    public init(district: String, districtName: String? = nil, school: School, menuType: MenuType, provider: MenuProviderKind = .nutrislice) {
+        self.providerKind = provider == .nutrislice ? nil : provider
         self.district = district
         self.districtName = districtName
         self.school = school
@@ -16,10 +21,11 @@ public struct MenuSource: Codable, Hashable, Sendable {
     }
 
     /// Stable identifier used for cache keys and favorites bookkeeping.
-    public var key: String { "\(district)/\(school.slug)/\(menuType.slug)" }
+    public var key: String { provider == .nutrislice ? "\(district)/\(school.slug)/\(menuType.slug)" : "\(placeKey)/\(menuType.slug)" }
 
     /// The public web page for this menu, for "Open in browser".
     public func webURL(on day: LocalDate? = nil) -> URL? {
+        if provider == .rutgersFoodPro { return RutgersFoodPro.menuURL(source: self, day: day ?? LocalDate(Date())) }
         var string = "https://\(district).nutrislice.com/menu/\(school.slug)/\(menuType.slug)"
         if let day { string += "/\(day.isoString)" }
         return URL(string: string)

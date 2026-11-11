@@ -31,8 +31,15 @@ final class AppSettings {
     @ObservationIgnored private let defaults: UserDefaults
 
     var source: MenuSource? {
-        didSet { save(source, for: .source) }
+        didSet {
+            save(source, for: .source)
+            savedPlaces = SavedPlaces.migrate(saved: savedPlaces, legacy: source)
+        }
     }
+
+    var savedPlaces: [MenuSource] { didSet { save(savedPlaces, for: .savedPlaces) } }
+    var proteinRanking: ProteinRanking { didSet { defaults.set(proteinRanking.rawValue, forKey: Key.proteinRanking.rawValue) } }
+    var stationExpansion: [String: Bool] { didSet { save(stationExpansion, for: .stationExpansion) } }
 
     var skipWeekends: Bool {
         didSet { defaults.set(skipWeekends, forKey: Key.skipWeekends.rawValue) }
@@ -65,7 +72,11 @@ final class AppSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        source = Self.load(MenuSource.self, defaults, .source)
+        let legacySource = Self.load(MenuSource.self, defaults, .source)
+        source = legacySource
+        savedPlaces = SavedPlaces.migrate(saved: Self.load([MenuSource].self, defaults, .savedPlaces), legacy: legacySource)
+        proteinRanking = defaults.string(forKey: Key.proteinRanking.rawValue).flatMap(ProteinRanking.init(rawValue:)) ?? .perServing
+        stationExpansion = Self.load([String: Bool].self, defaults, .stationExpansion) ?? [:]
         skipWeekends = defaults.object(forKey: Key.skipWeekends.rawValue) as? Bool ?? true
         if defaults.bool(forKey: Key.hotKeyCleared.rawValue) {
             hotKey = nil
@@ -76,6 +87,7 @@ final class AppSettings {
         avoidedAllergens = Set((Self.load([String].self, defaults, .avoidedAllergens) ?? []).compactMap(Allergen.init(rawValue:)))
         favorites = Self.load([String: String].self, defaults, .favorites) ?? [:]
         notifyFavorites = defaults.bool(forKey: Key.notifyFavorites.rawValue)
+        save(savedPlaces, for: .savedPlaces)
     }
 
     var favoriteKeys: Set<String> { Set(favorites.keys) }
@@ -96,7 +108,7 @@ final class AppSettings {
     // MARK: Persistence
 
     private enum Key: String {
-        case source, skipWeekends, hotKey, hotKeyCleared, textSize, avoidedAllergens, favorites, notifyFavorites
+        case savedPlaces, proteinRanking, stationExpansion, source, skipWeekends, hotKey, hotKeyCleared, textSize, avoidedAllergens, favorites, notifyFavorites
     }
 
     private func save<T: Encodable>(_ value: T?, for key: Key) {
