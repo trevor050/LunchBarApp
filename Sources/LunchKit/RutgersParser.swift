@@ -30,7 +30,10 @@ public enum RutgersParser {
         var title = "Menu"
         var items: [MenuItem] = []
         func close() {
-            if !items.isEmpty { sections.append(MenuSection(id: title + "-\(sections.count)", title: title, items: items)) }
+            if !items.isEmpty {
+                let shown = DisplayText.normalized(title)
+                sections.append(MenuSection(id: title + "-\(sections.count)", title: shown, items: items, rawTitle: shown == title ? nil : title))
+            }
             items = []
         }
         let fields = try box.select("fieldset")
@@ -51,8 +54,10 @@ public enum RutgersParser {
             guard token.hasPrefix(recipe + "*"), token.split(separator: "*").count == 3 else { throw ParseError.unexpectedHTML }
             let name = try label.text()
             guard !name.isEmpty else { throw ParseError.unexpectedHTML }
-            items.append(MenuItem(id: "\(title)-\(items.count)-\(recipe)", foodID: recipe, name: name,
-                                  category: title, servingSize: try serving.text(), providerReference: token))
+            let shownName = DisplayText.normalized(name)
+            items.append(MenuItem(id: "\(title)-\(items.count)-\(recipe)", foodID: recipe, name: shownName,
+                                  category: DisplayText.normalized(title), servingSize: try serving.text(), providerReference: token,
+                                  rawName: shownName == name ? nil : name))
         }
         close()
         guard sections.flatMap(\.items).count == fields.count else { throw ParseError.unexpectedHTML }

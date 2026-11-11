@@ -40,21 +40,31 @@ public struct MenuDay: Codable, Hashable, Sendable, Identifiable {
 public struct MenuSection: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     /// Station or section name, e.g. "Entrees". Nil for the untitled leading section.
+    /// Display text (re-cased by `DisplayText` when the provider sends capitals).
     public var title: String?
+    /// The title exactly as the provider sent it, only set when it differs from `title`.
+    public var rawTitle: String?
     public var items: [MenuItem]
 
-    public init(id: String, title: String?, items: [MenuItem]) {
+    public init(id: String, title: String?, items: [MenuItem], rawTitle: String? = nil) {
         self.id = id
         self.title = title
+        self.rawTitle = rawTitle
         self.items = items
     }
+
+    /// The title exactly as the provider sent it.
+    public var providerTitle: String? { rawTitle ?? title }
 }
 
 public struct MenuItem: Codable, Hashable, Sendable, Identifiable {
     /// The menu-entry id (unique within a week even when a food repeats).
     public var id: String
     public var foodID: String
+    /// Display text (re-cased by `DisplayText` when the provider sends capitals).
     public var name: String
+    /// The name exactly as the provider sent it, only set when it differs from `name`.
+    public var rawName: String?
     public var description: String?
     public var imageURL: URL?
     public var category: String?
@@ -71,14 +81,18 @@ public struct MenuItem: Codable, Hashable, Sendable, Identifiable {
     /// Provider form token; not part of the shared food identity.
     public var providerReference: String?
 
+    /// The name exactly as the provider sent it.
+    public var providerName: String { rawName ?? name }
+
     public init(
         id: String, foodID: String, name: String, description: String? = nil, imageURL: URL? = nil,
         category: String? = nil, calories: Int? = nil, servingSize: String? = nil, ingredients: String? = nil,
-        allergens: [String] = [], dietaryTags: [String] = [], foodGroups: [String] = [], nutrition: [Nutrient] = [], providerReference: String? = nil
+        allergens: [String] = [], dietaryTags: [String] = [], foodGroups: [String] = [], nutrition: [Nutrient] = [], providerReference: String? = nil, rawName: String? = nil
     ) {
         self.id = id
         self.foodID = foodID
         self.name = name
+        self.rawName = rawName
         self.description = description
         self.imageURL = imageURL
         self.category = category

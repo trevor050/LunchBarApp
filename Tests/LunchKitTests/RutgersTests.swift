@@ -52,7 +52,7 @@ struct RutgersParserTests {
         let real = String(decoding: try rutgersFixture("04-lunch-2026-11-10.html"), as: UTF8.self)
         let entity = real.replacingOccurrences(of: "FRENCH FRIES", with: "FRIES &amp; CHEESE")
         let menu = try RutgersParser.menu(Data(entity.utf8), date: day, meal: "Lunch")
-        #expect(menu.items.contains { $0.name.contains("& CHEESE") })
+        #expect(menu.items.contains { $0.providerName.contains("& CHEESE") && $0.name.contains("Fries & Cheese") })
         let broken = real.replacingOccurrences(of: "RecNumAndPort=", with: "changed=")
         #expect(throws: (any Error).self) { try RutgersParser.menu(Data(broken.utf8), date: day, meal: "Lunch") }
     }

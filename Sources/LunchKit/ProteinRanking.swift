@@ -21,7 +21,7 @@ public enum ProteinRanking: String, CaseIterable, Codable, Sendable {
         }.sorted {
             let a = score($0)!, b = score($1)!
             if a != b { return a > b }
-            if $0.name != $1.name { return $0.name < $1.name }
+            if $0.providerName != $1.providerName { return $0.providerName < $1.providerName }
             return $0.id < $1.id
         }.filter { seen.insert($0.foodID.isEmpty ? $0.id : $0.foodID).inserted }.prefix(max(0, limit)).map { $0 }
     }
