@@ -124,7 +124,7 @@ struct PopoverView: View {
                 .controlSize(.small)
                 .accessibilityLabel("Loading menu")
         case .menu(let day):
-            MenuListView(day: day, settings: model.settings)
+            MenuListView(day: day, settings: model.settings, expanded: $model.expandedItemID)
         case .empty(let reason):
             emptyState(reason)
         case .failed(let error):

@@ -71,11 +71,6 @@ final class FavoriteNotifier {
         return (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
     }
 
-    func authorizationDenied() async -> Bool {
-        guard let center else { return true }
-        return await center.notificationSettings().authorizationStatus == .denied
-    }
-
     /// Reconciles pending notifications for one loaded week.
     func update(source: MenuSource, week: MenuWeek, now: Date = Date()) {
         guard let center else { return }
@@ -118,10 +113,11 @@ final class FavoriteNotifier {
 
     func removeAll() {
         guard let center else { return }
-        Task {
-            let pending = await center.pendingNotificationRequests()
-            let ids = pending.map(\.identifier).filter { $0.hasPrefix(Self.identifierPrefix) }
-            center.removePendingNotificationRequests(withIdentifiers: ids)
+        let prefix = Self.identifierPrefix
+        // Filter inside the callback so only Sendable strings leave it.
+        center.getPendingNotificationRequests { requests in
+            let ids = requests.map(\.identifier).filter { $0.hasPrefix(prefix) }
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
         }
     }
 

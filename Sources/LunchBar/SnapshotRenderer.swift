@@ -10,6 +10,7 @@ import SwiftUI
 ///   --steps N        press the next-day arrow N times (negative for previous) before rendering
 ///   --offline        load once, then lose the network and refresh (stale-copy banner)
 ///   --offline-cold   no network from the start (offline empty state)
+///   --expand TEXT    expand the first item whose name contains TEXT
 ///   --avoid-milk     flag milk as an avoided allergen
 ///   --settings       also render the Settings window and the first-run school picker
 ///
@@ -61,6 +62,11 @@ enum SnapshotRenderer {
                 steps > 0 ? model.showNext() : model.showPrevious()
                 settle()
             }
+        }
+        if let index = arguments.firstIndex(of: "--expand"), arguments.indices.contains(index + 1),
+           case .menu(let menuDay) = model.phase {
+            let needle = arguments[index + 1].lowercased()
+            model.expandedItemID = menuDay.items.first { $0.name.lowercased().contains(needle) }?.id
         }
         if arguments.contains("--offline") {
             network.isOffline = true

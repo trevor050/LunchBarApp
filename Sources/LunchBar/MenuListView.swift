@@ -4,7 +4,7 @@ import SwiftUI
 struct MenuListView: View {
     let day: MenuDay
     let settings: AppSettings
-    @State private var expanded: String?
+    @Binding var expanded: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -35,7 +35,6 @@ struct MenuListView: View {
             .padding(.bottom, 8)
         }
         .scrollIndicators(.automatic)
-        .onChange(of: day.date) { expanded = nil }
     }
 
     private func toggle(_ item: MenuItem) {

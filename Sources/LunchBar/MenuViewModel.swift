@@ -27,6 +27,8 @@ final class MenuViewModel {
     private(set) var staleNotice: String?
     private(set) var isRefreshing = false
     private(set) var week: MenuWeek?
+    /// The item whose details are expanded in the list.
+    var expandedItemID: String?
 
     @ObservationIgnored let settings: AppSettings
     @ObservationIgnored let repository: MenuRepository
@@ -77,6 +79,7 @@ final class MenuViewModel {
     func go(to date: LocalDate) {
         guard date != day else { return }
         day = date
+        expandedItemID = nil
         load()
     }
 
