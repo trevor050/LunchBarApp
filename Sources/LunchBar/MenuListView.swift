@@ -1,6 +1,14 @@
 import LunchKit
 import SwiftUI
 
+/// Reports the natural height of the menu rows so the popover can size itself to fit.
+struct MenuListHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct MenuListView: View {
     let day: MenuDay
     let settings: AppSettings
@@ -9,7 +17,7 @@ struct MenuListView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(day.sections) { section in
                     if let title = section.title {
                         Text(title)
@@ -33,6 +41,11 @@ struct MenuListView: View {
                 }
             }
             .padding(.bottom, 8)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: MenuListHeightKey.self, value: proxy.size.height)
+                }
+            )
         }
         .scrollIndicators(.automatic)
     }

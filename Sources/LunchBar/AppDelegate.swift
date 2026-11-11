@@ -108,9 +108,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             quit: { NSApp.terminate(nil) }
         )
         let controller = NSHostingController(rootView: root)
-        controller.sizingOptions = []
+        // Let the popover follow the SwiftUI content's size, so short menus get a short popover.
+        controller.sizingOptions = [.preferredContentSize]
         popover.contentViewController = controller
-        popover.contentSize = PopoverView.size
     }
 
     func togglePopover() {

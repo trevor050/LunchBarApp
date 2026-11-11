@@ -7,18 +7,35 @@ struct PopoverView: View {
     var openSettings: () -> Void
     var quit: () -> Void
 
+    /// The largest the popover gets. It shrinks to fit shorter menus.
     static let size = CGSize(width: 360, height: 460)
+    /// Tallest the scrolling menu list may grow before it scrolls.
+    private static let maxListHeight: CGFloat = 372
+    /// Height of the area used for loading, empty and error messages.
+    private static let messageHeight: CGFloat = 190
+
+    @State private var listHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
             content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
+                .frame(height: bodyHeight)
             footer
         }
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(width: Self.size.width)
+        .onPreferenceChange(MenuListHeightKey.self) { listHeight = $0 }
         .environment(\.textScale, model.settings.textSize.scale)
+    }
+
+    /// The menu list is as tall as its rows, up to a cap; other states use a compact fixed height.
+    private var bodyHeight: CGFloat {
+        if case .menu = model.phase {
+            return min(max(listHeight, 52), Self.maxListHeight)
+        }
+        return Self.messageHeight
     }
 
     // MARK: Header
