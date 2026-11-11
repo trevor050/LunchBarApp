@@ -11,7 +11,7 @@ enum LunchBarApp {
         }
 
         let app = NSApplication.shared
-        let delegate = AppDelegate()
+        let delegate = AppDelegate(settings: PopoverSelfTest.enabled ? PopoverSelfTest.settings() : AppSettings())
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
         withExtendedLifetime(delegate) {

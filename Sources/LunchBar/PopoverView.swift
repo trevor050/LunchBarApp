@@ -6,6 +6,8 @@ struct PopoverView: View {
     @Bindable var model: MenuViewModel
     var openSettings: () -> Void
     var quit: () -> Void
+    var onSizeChange: (CGSize) -> Void = { _ in }
+    var onNavigation: () -> Void = {}
 
     /// The largest the popover gets. It shrinks to fit shorter menus.
     static let size = CGSize(width: 360, height: 460)
@@ -26,6 +28,12 @@ struct PopoverView: View {
             footer
         }
         .frame(width: Self.size.width)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(GeometryReader { proxy in
+            Color.clear.preference(key: PopoverSizeKey.self, value: proxy.size)
+        })
+        .onPreferenceChange(PopoverSizeKey.self) { onSizeChange($0) }
+        .onChange(of: model.day) { onNavigation() }
         .onPreferenceChange(MenuListHeightKey.self) { listHeight = $0 }
         .environment(\.textScale, model.settings.textSize.scale)
     }
@@ -301,5 +309,14 @@ enum DayTitle {
             return date.formatted(.dateTime.month(.abbreviated).day().year())
         }
         return date.formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
+/// Natural size only. AppDelegate owns when AppKit is allowed to apply it.
+private struct PopoverSizeKey: PreferenceKey {
+    static let defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        value = CGSize(width: max(value.width, next.width), height: max(value.height, next.height))
     }
 }

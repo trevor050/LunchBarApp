@@ -78,8 +78,8 @@ enum SnapshotRenderer {
             .background(Color(nsColor: .windowBackgroundColor))
         var name = "\(district)-\(schoolSlug)-\(menuSlug)-\(model.day.isoString)"
         if network.isOffline { name += "-offline" }
-        render(popover, size: PopoverView.size, appearance: .aqua, to: output.appending(path: "\(name)-light.png"))
-        render(popover, size: PopoverView.size, appearance: .darkAqua, to: output.appending(path: "\(name)-dark.png"))
+        render(popover, size: PopoverView.size, appearance: .aqua, to: output.appending(path: "\(name)-light.png"), fitContent: true)
+        render(popover, size: PopoverView.size, appearance: .darkAqua, to: output.appending(path: "\(name)-dark.png"), fitContent: true)
 
         if arguments.contains("--settings") {
             let finder = SchoolFinder(client: client)
@@ -104,7 +104,8 @@ enum SnapshotRenderer {
         exit(0)
     }
 
-    private static func render(_ view: some View, size: CGSize, appearance: NSAppearance.Name, to url: URL) {
+    private static func render(_ view: some View, size: CGSize, appearance: NSAppearance.Name, to url: URL, fitContent: Bool = false) {
+        var renderSize = size
         let hosting = NSHostingView(rootView: view)
         hosting.frame = CGRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: hosting.frame, styleMask: [.borderless], backing: .buffered, defer: false)
@@ -114,14 +115,20 @@ enum SnapshotRenderer {
         // Give AsyncImage a moment to load thumbnails.
         spin(until: { false }, timeout: 3)
         hosting.layoutSubtreeIfNeeded()
+        if fitContent {
+            renderSize.height = ceil(hosting.fittingSize.height)
+            hosting.setFrameSize(renderSize)
+            window.setContentSize(renderSize)
+            hosting.layoutSubtreeIfNeeded()
+        }
 
         let scale: CGFloat = 2
         guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
+            bitmapDataPlanes: nil, pixelsWide: Int(renderSize.width * scale), pixelsHigh: Int(renderSize.height * scale),
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
         ) else { return }
-        rep.size = size
+        rep.size = renderSize
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
         if let png = rep.representation(using: .png, properties: [:]) {
             try? png.write(to: url)

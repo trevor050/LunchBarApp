@@ -1,0 +1,25 @@
+{
+  "steps": 360,
+  "layoutChecks": 2880,
+  "failed": 0,
+  "guardFires": 507,
+  "heights": [
+    199,
+    219,
+    285,
+    459,
+    463,
+    467
+  ],
+  "growing": 125,
+  "shrinking": 126,
+  "expandedSteps": 36,
+  "meals": [
+    "breakfast",
+    "lunch"
+  ],
+  "icons": [
+    "{{1061, 900}, {38, 30}}",
+    "{{1061, 932}, {38, 30}}"
+  ]
+}
