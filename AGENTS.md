@@ -29,3 +29,5 @@ Menu bar app (Swift 6 package, macOS 14+) showing any Nutrislice school's menu. 
 - Popover size is fixed (`PopoverView.size`) on purpose; resizing re-anchors NSPopover and jumps.
 - macOS has no Dynamic Type for 3rd-party apps; text uses `scaledFont(_:)` with the app's Text Size setting.
 - Legacy 1.x config (`~/Library/Application Support/LunchBarApp/config.env`, `~/.lunchbar.env`, env vars) is imported once when no source is set.
+- Don't build API URLs with `URL.appending(path:)`: trailing-slash handling differs between macOS 15 and 26 SDKs (CI on macos-15 produced `schools//`). `NutrisliceClient` concatenates strings.
+- CI is macos-15 / Xcode 16.4 / Swift 6.1, stricter about non-Sendable SDK types (UserNotifications) than local Swift 6.2. Use completion-handler APIs there.
