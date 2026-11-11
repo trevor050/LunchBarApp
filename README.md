@@ -19,9 +19,9 @@ I originally built it for my own high school's menu. It now works with Nutrislic
 - ← and → browse days, T jumps back to today. Weekends are skipped unless you turn that off (dining halls that serve every day exist).
 - Save several places, then switch place or meal from the header. Your existing school is saved automatically.
 - Every item shows its calories on the right, where you can scan them, next to the food photo when the district publishes one.
-- Top protein shows up to five published choices, with grams, calories and station. Settings chooses grams per serving or protein per 100 calories. It only appears on menus big enough for it to help (at least eight ranked items, and never most of the menu), so a two-item lunch isn't listed twice.
+- Top picks ranks a big menu by your goal: high protein, lean protein, low calorie, low carb, high fiber, low sugar or low sodium. Pick it right from the group's heading. The "low" goals only count real meals and sides, so the answer isn't five condiments and a cup of water. It only shows up on menus big enough for it to help (at least eight ranked items, and never most of the menu). [Exact rules](docs/research/top-picks.md).
 - Large menus get a name filter and collapsible stations, collapsed by default above 25 items. Station choices are remembered.
-- Small ounce portions at explicitly ingredient/build-your-own stations are excluded from the ranking, while remaining in the full menu. Entree stations, EACH/SLICE servings and portions over 2 OZ remain eligible. [Exact rule and limits](docs/research/protein-ranking.md).
+- Small ounce portions at explicitly ingredient/build-your-own stations are excluded from the ranking, while remaining in the full menu. Entree stations, EACH/SLICE servings and portions over 2 OZ remain eligible. [Exact rule and limits](docs/research/top-picks.md).
 - Click an item for a big photo, calories, protein, carbs and fat at a glance, and allergens. The full nutrition label and ingredients are one more click away.
 - Pick allergens to avoid and items that contain them get flagged. Vegan, vegetarian and halal tags show up when the district marks them.
 - Star a favorite and get a 7:30 AM notification on days it's served. (Chicken patty day deserves a heads up.)
@@ -134,7 +134,7 @@ The README images come from the app's own snapshot mode, which renders the real 
 swift run LunchBar --render-snapshots docs/shots middlesex middlesex-high lunch 2026-11-09
 swift run LunchBar --render-snapshots docs/shots middlesex middlesex-high lunch 2026-11-11 --expand tot
 swift run LunchBar --render-snapshots docs/shots salkeiz auburn-elementary lunch 2026-11-10 --avoid-milk
-swift run LunchBar --render-snapshots docs/shots rutgers-foodpro 04 Lunch 2026-11-11 --text-size large
+swift run LunchBar --render-snapshots docs/shots rutgers-foodpro 04 Lunch 2026-11-11 --goal lowCalorie
 # Real hall/meal/day and saved-place matrix, plus Middlesex:
 swift run LunchBar --render-snapshots docs/matrix rutgers-foodpro 04 Lunch 2026-11-10 --matrix
 # Drives the real status item and menu window through 400 content changes and checks

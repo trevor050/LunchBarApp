@@ -6,6 +6,27 @@ import LunchKit
 @MainActor
 @Suite("Saved settings migration")
 struct SettingsTests {
+    @Test(arguments: [("perServing", PickGoal.highProtein), ("per100Calories", PickGoal.leanProtein)])
+    func migratesTheOldProteinRankingToAGoal(stored: String, goal: PickGoal) {
+        let name = "LunchBarSettingsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set(stored, forKey: "proteinRanking")
+        #expect(AppSettings(defaults: defaults).pickGoal == goal)
+        // A chosen goal wins over the old key from then on.
+        AppSettings(defaults: defaults).pickGoal = .lowSodium
+        #expect(AppSettings(defaults: defaults).pickGoal == .lowSodium)
+        #expect(defaults.string(forKey: "proteinRanking") == stored)
+    }
+
+    @Test func freshSettingsDefaultToHighProtein() {
+        let name = "LunchBarSettingsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set("garbage", forKey: "pickGoal")
+        #expect(AppSettings(defaults: defaults).pickGoal == .highProtein)
+    }
+
     @Test func migratesExistingUserDefaultsAndRestoresMultiplePlaces() throws {
         let name = "LunchBarSettingsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
@@ -17,15 +38,15 @@ struct SettingsTests {
         #expect(settings.savedPlaces == [source])
         #expect(settings.source == source)
         #expect(!settings.skipWeekends)
-        #expect(settings.proteinRanking == .perServing)
+        #expect(settings.pickGoal == .highProtein)
         let hall = RutgersLocations.source(hall: RutgersLocations.foodPro[1])
         settings.source = hall
-        settings.proteinRanking = .per100Calories
+        settings.pickGoal = .lowCarb
         settings.stationExpansion["hall/Entrees"] = true
         let restored = AppSettings(defaults: defaults)
         #expect(restored.savedPlaces.count == 2)
         #expect(restored.source == hall)
-        #expect(restored.proteinRanking == .per100Calories)
+        #expect(restored.pickGoal == .lowCarb)
         #expect(restored.stationExpansion["hall/Entrees"] == true)
         var breakfast = hall; breakfast.menuType = RutgersLocations.meals[0]
         restored.source = breakfast
@@ -51,13 +72,13 @@ struct FoodProViewModelTests {
         let model = MenuViewModel(settings: settings, repository: repository, now: { date.date()!.addingTimeInterval(3600 * 12) })
         model.panelWillOpen()
         #expect(model.isRefreshing)
-        #expect(model.topProteinItems.isEmpty)
+        #expect(model.topPicks.isEmpty)
         for _ in 0..<400 {
             if !model.isRefreshing && !model.nutritionLoading { break }
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(!model.nutritionLoading)
-        #expect(model.topProteinItems.map(\.name) == ["Safe chicken", "Eggs"])
+        #expect(model.topPicks.map(\.name) == ["Safe chicken", "Eggs"])
         guard case .menu(let day) = model.phase else { Issue.record("Expected menu"); return }
         #expect(day.items.first?.warnings(avoiding: [.milk]).isEmpty == false)
         #expect(day.items.count == 3)
@@ -69,7 +90,7 @@ struct FoodProViewModelTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(await loader.count == cold)
-        #expect(model.topProteinItems.map(\.name) == ["Safe chicken", "Eggs"])
+        #expect(model.topPicks.map(\.name) == ["Safe chicken", "Eggs"])
     }
 }
 

@@ -13,7 +13,8 @@ import SwiftUI
 ///   --expand TEXT    expand the first item whose name contains TEXT
 ///   --avoid-milk     flag milk as an avoided allergen
 ///   --settings       also render the Settings window and the first-run school picker
-///   --protein-lean   use protein per 100 calories
+///   --protein-lean   use protein per 100 calories (same as --goal leanProtein)
+///   --goal GOAL      Top picks goal: highProtein, leanProtein, lowCalorie, lowCarb, highFiber, lowSugar, lowSodium
 ///   --filter TEXT    filter the full menu by item name
 ///   --loading        delay report transport to render the actual pending state
 ///   --matrix         verify hall/meal/day switching and cached reopens
@@ -63,7 +64,9 @@ enum SnapshotRenderer {
             }
             settings.source = MenuSource(district: district, districtName: districtName, school: school, menuType: type)
         }
-        if arguments.contains("--protein-lean") { settings.proteinRanking = .per100Calories }
+        if arguments.contains("--protein-lean") { settings.pickGoal = .leanProtein }
+        if let index = arguments.firstIndex(of: "--goal"), arguments.indices.contains(index + 1),
+           let goal = PickGoal(rawValue: arguments[index + 1]) { settings.pickGoal = goal }
         if arguments.contains("--avoid-milk") { settings.avoidedAllergens = [.milk] }
         if let index = arguments.firstIndex(of: "--text-size"), arguments.indices.contains(index + 1),
            let size = TextSize(rawValue: arguments[index + 1]) { settings.textSize = size }
@@ -85,7 +88,7 @@ enum SnapshotRenderer {
         print("requests cold=\(coldRequests) warm=\(network.requestCount - coldRequests)")
         if let notice = model.nutritionNotice { print("nutritionNotice=\(notice)") }
         if case .menu(let menu) = model.phase {
-            print("items=\(menu.items.count) top=" + model.topProteinItems.map { "\($0.name):\($0.protein ?? 0)g/\($0.calories ?? 0)cal [\($0.foodID)]" }.joined(separator: "; "))
+            print("items=\(menu.items.count) goal=\(settings.pickGoal.rawValue) shows=\(model.showsTopPicks) top=" + model.topPicks.map { "\($0.name):\(settings.pickGoal.value($0) ?? -1) \(settings.pickGoal.unitDescription)/\($0.calories ?? 0)cal [\($0.foodID)]" }.joined(separator: "; "))
         } else { print("phase=\(model.phase)") }
         if let index = arguments.firstIndex(of: "--steps"), arguments.indices.contains(index + 1), let steps = Int(arguments[index + 1]) {
             for _ in 0..<abs(steps) {
@@ -155,7 +158,7 @@ enum SnapshotRenderer {
                     model.go(to: selectedDate)
                     settle()
                     guard case .menu(let menu) = model.phase, menu.date == selectedDate, !model.nutritionLoading,
-                          model.nutritionNotice == nil, !model.topProteinItems.isEmpty else {
+                          model.nutritionNotice == nil, !model.topPicks.isEmpty else {
                         failures += 1
                         records.append(["hall": hall.name, "meal": meal.name, "date": selectedDate.isoString, "phase": String(describing: model.phase), "nutritionNotice": model.nutritionNotice ?? ""])
                         continue
@@ -163,7 +166,7 @@ enum SnapshotRenderer {
                     let before = network.requestCount
                     model.panelWillOpen(); model.go(to: selectedDate); settle()
                     let warm = network.requestCount - before
-                    let top = model.topProteinItems.map { ["name": $0.name, "protein": $0.protein ?? 0, "calories": $0.calories ?? 0, "recipe": $0.foodID, "station": $0.category ?? ""] as [String: Any] }
+                    let top = model.topPicks.map { ["name": $0.name, "protein": $0.protein ?? 0, "calories": $0.calories ?? 0, "recipe": $0.foodID, "station": $0.category ?? ""] as [String: Any] }
                     records.append(["hall": hall.name, "meal": meal.name, "date": selectedDate.isoString,
                                     "items": menu.items.count, "stations": menu.sections.count, "warmRequests": warm, "top": top,
                                     "nutritionNotice": model.nutritionNotice ?? ""])
@@ -179,7 +182,7 @@ enum SnapshotRenderer {
             model.select(place: MenuSource(district: "middlesex", school: school, menuType: meal))
             model.go(to: date); settle()
             if case .menu(let menu) = model.phase {
-                records.append(["hall": school.name, "date": date.isoString, "items": menu.items.count, "topCount": model.topProteinItems.count])
+                records.append(["hall": school.name, "date": date.isoString, "items": menu.items.count, "topCount": model.topPicks.count])
                 renderPanel(model: model, appearance: .aqua, to: output.appending(path: "matrix-middlesex.png"))
             } else { failures += 1 }
         } else { failures += 1 }

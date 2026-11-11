@@ -31,7 +31,7 @@ struct MenuListView: View {
                     .accessibilityLabel("Filter items by name")
             }
             if filter.isEmpty && showsTop {
-                proteinGroup
+                picksGroup
             }
             if let nutritionNotice {
                 Text(nutritionNotice).scaledFont(.caption1).foregroundStyle(.secondary)
@@ -83,37 +83,55 @@ struct MenuListView: View {
         .onChange(of: settings.source?.key) { filter = ""; visibleTop = nil }
     }
 
-    private var proteinGroup: some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private var picksGroup: some View {
+        let goal = settings.pickGoal
+        return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Text("Top protein")
-                Text(settings.proteinRanking.heading).foregroundStyle(.tertiary)
+                Menu {
+                    Picker("Top picks", selection: Bindable(settings).pickGoal) {
+                        ForEach(PickGoal.allCases, id: \.self) { goal in Text(goal.title).tag(goal) }
+                    }
+                    .pickerStyle(.inline)
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Top picks · \(goal.title)")
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
+                    }
+                    .scaledFont(.subheadline, weight: .semibold)
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+                .help("Choose what Top picks ranks by")
+                .accessibilityLabel("Top picks, \(goal.title). Choose a goal")
                 if nutritionLoading { ProgressView().controlSize(.mini).accessibilityLabel("Loading published nutrition") }
                 Spacer()
+                Text(goal.unitDescription)
+                    .scaledFont(.caption1)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
-            .scaledFont(.subheadline, weight: .semibold)
-            .foregroundStyle(.secondary)
             .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
             let shown = visibleTop ?? topItems
             if shown.isEmpty {
-                Text(nutritionLoading ? "Checking published nutrition…" : "No ranked items")
+                Text("Checking published nutrition…")
                     .scaledFont(.caption1).foregroundStyle(.secondary)
                     .padding(.horizontal, 14).frame(height: 40)
             } else {
                 let photos = shown.contains { $0.imageURL != nil }
-                ForEach(shown) { item in row(item, photos: photos, protein: settings.proteinRanking) }
+                ForEach(shown) { item in row(item, photos: photos, goal: goal) }
             }
         }
         .padding(.bottom, 4)
     }
 
-    private func row(_ item: MenuItem, photos: Bool, protein: ProteinRanking? = nil) -> some View {
+    private func row(_ item: MenuItem, photos: Bool, goal: PickGoal? = nil) -> some View {
         MenuItemRow(item: item, avoided: settings.avoidedAllergens,
                     isFavorite: settings.isFavorite(item), isExpanded: expanded == item.id,
                     showsPhoto: photos,
                     toggleExpanded: { toggle(item) }, toggleFavorite: { settings.toggleFavorite(item) },
-                    proteinMode: protein, unknownAllergens: foodPro && !verifiedRecipes.contains(item.foodID))
+                    goal: goal, unknownAllergens: foodPro && !verifiedRecipes.contains(item.foodID))
     }
 
     private func toggle(_ item: MenuItem) {
@@ -159,6 +177,16 @@ enum Figures {
         return String(format: "%.1f g", value)
     }
 
+    /// The Top picks figure for a goal's value.
+    static func goal(_ value: Double, _ goal: PickGoal) -> String {
+        switch goal {
+        case .leanProtein: String(format: "%.1f g", value)
+        case .lowCalorie: "\(Int(value.rounded()))"
+        case .lowSodium: "\(Int(value.rounded())) mg"
+        default: grams(value)
+        }
+    }
+
     static func nutrient(_ item: MenuItem, _ names: String...) -> Double? {
         item.nutrition.first { nutrient in names.contains(nutrient.name.lowercased()) && nutrient.unit == "g" }?.amount
     }
@@ -172,7 +200,8 @@ struct MenuItemRow: View {
     let showsPhoto: Bool
     let toggleExpanded: () -> Void
     let toggleFavorite: () -> Void
-    var proteinMode: ProteinRanking? = nil
+    /// Set for rows in the Top picks group: the figure follows the goal.
+    var goal: PickGoal? = nil
     var unknownAllergens = false
 
     @State private var isHovering = false
@@ -264,11 +293,11 @@ struct MenuItemRow: View {
     }
 
     /// One quiet line: an avoided-allergen warning first (it matters most), then
-    /// dietary highlights, or the station for the Top protein group.
+    /// dietary highlights, or the station for the Top picks group.
     @ViewBuilder
     private var secondaryLine: some View {
-        let context: [String] = proteinMode != nil
-            ? [item.category, proteinMode == .per100Calories ? proteinMode?.score(item).map { String(format: "%.1f g / 100 cal", $0) } : nil].compactMap { $0 }
+        let context: [String] = goal != nil
+            ? [item.category, goal == .leanProtein ? item.protein.map { Figures.grams($0) + " protein" } : nil].compactMap { $0 }
             : Array(item.dietaryTags.prefix(2))
         // Expanded details flag avoided allergens themselves.
         let warnings = isExpanded ? [] : warnings
@@ -289,14 +318,16 @@ struct MenuItemRow: View {
         }
     }
 
-    /// The right-hand column: calories, or protein over calories in the Top protein group.
+    /// The right-hand column: calories, or in the Top picks group the goal's
+    /// figure over the calories.
     @ViewBuilder
     private var figure: some View {
         VStack(alignment: .trailing, spacing: 0) {
-            if proteinMode != nil, let protein = item.protein {
-                Text(Figures.grams(protein)).scaledFont(.body, weight: .semibold)
-                Text(item.calories.map { "\($0) cal" } ?? "protein")
-                    .scaledFont(.caption1).foregroundStyle(.secondary)
+            if let goal, goal != .lowCalorie, let value = goal.value(item) {
+                Text(Figures.goal(value, goal)).scaledFont(.body, weight: .semibold)
+                if let calories = item.calories {
+                    Text("\(calories) cal").scaledFont(.caption1).foregroundStyle(.secondary)
+                }
             } else if let calories = item.calories {
                 Text("\(calories)").scaledFont(.body, weight: .semibold)
                 Text("cal").scaledFont(.caption1).foregroundStyle(.secondary)
@@ -314,7 +345,9 @@ struct MenuItemRow: View {
 
     private var accessibilityLabel: String {
         var parts = [item.name]
-        if let protein = item.protein, proteinMode != nil { parts.append("\(Figures.grams(protein).replacingOccurrences(of: " g", with: "")) grams protein") }
+        if let goal, goal != .lowCalorie, let value = goal.value(item) {
+            parts.append(Figures.goal(value, goal).replacingOccurrences(of: " g", with: "").replacingOccurrences(of: " mg", with: "") + " " + goal.unitDescription.replacingOccurrences(of: "g ", with: "grams ").replacingOccurrences(of: "mg ", with: "milligrams "))
+        }
         if let calories = item.calories { parts.append("\(calories) calories") }
         parts += item.dietaryTags
         if !warnings.isEmpty {

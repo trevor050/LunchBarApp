@@ -172,6 +172,10 @@ struct PanelView: View {
         Menu {
             Button("Refresh") { model.refresh() }
                 .keyboardShortcut("r")
+            // Also here so the goal can be changed on menus where the group is hidden.
+            Picker("Top Picks", selection: Bindable(model.settings).pickGoal) {
+                ForEach(PickGoal.allCases, id: \.self) { goal in Text(goal.title).tag(goal) }
+            }
             if let url = model.source?.webURL(on: model.day) {
                 Button("Open Published Menu") { NSWorkspace.shared.open(url) }
             }
@@ -233,11 +237,11 @@ struct PanelView: View {
                 .accessibilityLabel("Loading menu")
         case .menu(let day):
             MenuListView(day: day, settings: model.settings, expanded: $model.expandedItemID,
-                         topItems: model.topProteinItems, showsTop: model.showsTopProtein,
+                         topItems: model.topPicks, showsTop: model.showsTopPicks,
                          nutritionLoading: model.nutritionLoading,
                          nutritionNotice: model.nutritionNotice, verifiedRecipes: model.verifiedRecipes, filter: $model.menuFilter)
                 .onChange(of: model.expandedItemID) { _, id in model.loadDetails(id) }
-                .onChange(of: model.settings.proteinRanking) { model.loadNutrition() }
+                .onChange(of: model.settings.pickGoal) { model.loadNutrition() }
                 .onChange(of: model.settings.avoidedAllergens) { model.loadNutrition() }
         case .empty(let reason):
             emptyState(reason)

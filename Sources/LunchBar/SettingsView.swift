@@ -250,9 +250,6 @@ struct SettingsView: View {
             }
 
             Toggle("Skip weekends", isOn: $settings.skipWeekends)
-            Picker("Top protein ranking", selection: $settings.proteinRanking) {
-                ForEach(ProteinRanking.allCases, id: \.self) { mode in Text(mode.title).tag(mode) }
-            }
             Picker("Text size", selection: $settings.textSize) {
                 ForEach(TextSize.allCases) { size in
                     Text(size.title).tag(size)

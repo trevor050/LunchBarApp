@@ -67,39 +67,39 @@ struct ProteinTests {
     func day(_ items: [MenuItem]) -> MenuDay { MenuDay(date: LocalDate(iso: "2026-11-10")!, sections: [MenuSection(id: "a", title: nil, items: items)]) }
     @Test func modesAndMissingData() {
         let menu = day([item("Big", protein: 40, calories: 800), item("Lean", protein: 30, calories: 150), item("Unknown"), item("No calories", protein: 20), item("Zero", protein: 0, calories: 0)])
-        #expect(ProteinRanking.perServing.top(in: menu, avoiding: []).map(\.name) == ["Big", "Lean", "No calories"])
-        #expect(ProteinRanking.per100Calories.top(in: menu, avoiding: []).map(\.name) == ["Lean", "Big"])
-        #expect(ProteinRanking.perServing.top(in: day([item("Unknown")]), avoiding: []).isEmpty)
+        #expect(PickGoal.highProtein.top(in: menu, avoiding: []).map(\.name) == ["Big", "Lean", "No calories"])
+        #expect(PickGoal.leanProtein.top(in: menu, avoiding: []).map(\.name) == ["Lean", "Big"])
+        #expect(PickGoal.highProtein.top(in: day([item("Unknown")]), avoiding: []).isEmpty)
     }
     @Test func excludesAllergensAndIngredientPortionsButKeepsEntrees() {
         let menu = day([item("Cheese", protein: 50, station: "Cook to order bar", serving: "1 OZ"), item("Chicken", protein: 30, serving: "4 OZ"), item("Eggs", protein: 20, station: "Cook to order bar", serving: "4 OZ"), item("Milk", protein: 40, allergens: ["Milk"])])
-        #expect(ProteinRanking.perServing.top(in: menu, avoiding: [.milk]).map(\.name) == ["Chicken", "Eggs"])
-        #expect(ProteinRanking.isStandalone(item("Small entree", protein: 10, serving: "2 OZ")))
-        #expect(ProteinRanking.isStandalone(item("Grilled chicken", protein: 30, station: "Toppings", serving: "6 OZ")))
-        #expect(ProteinRanking.isStandalone(item("Chicken entree", protein: 30, station: "Cook to order", serving: "1 EACH")))
-        #expect(!ProteinRanking.isStandalone(item("Cheddar", protein: 7, station: "Salad Bar", serving: "1 OZ")))
-        #expect(ProteinRanking.isStandalone(item("Chicken salad", protein: 30, station: "Salad Bar", serving: "3 OZ")))
+        #expect(PickGoal.highProtein.top(in: menu, avoiding: [.milk]).map(\.name) == ["Chicken", "Eggs"])
+        #expect(PickGoal.isStandalone(item("Small entree", protein: 10, serving: "2 OZ")))
+        #expect(PickGoal.isStandalone(item("Grilled chicken", protein: 30, station: "Toppings", serving: "6 OZ")))
+        #expect(PickGoal.isStandalone(item("Chicken entree", protein: 30, station: "Cook to order", serving: "1 EACH")))
+        #expect(!PickGoal.isStandalone(item("Cheddar", protein: 7, station: "Salad Bar", serving: "1 OZ")))
+        #expect(PickGoal.isStandalone(item("Chicken salad", protein: 30, station: "Salad Bar", serving: "3 OZ")))
     }
     @Test func deterministicTiesDeduplicationAndFiveLimit() {
         var items = ["F", "E", "D", "C", "B", "A"].map { item($0, protein: 10, calories: 100) }
         var duplicate = items[0]; duplicate.id = "other-station"; items.append(duplicate)
-        #expect(ProteinRanking.perServing.top(in: day(items), avoiding: []).map(\.name) == ["A", "B", "C", "D", "E"])
-        #expect(ProteinRanking.per100Calories.top(in: day(items.reversed()), avoiding: []).map(\.name) == ["A", "B", "C", "D", "E"])
-        #expect(ProteinRanking.perServing.top(in: day([item("Bad", protein: .infinity)]), avoiding: []).isEmpty)
+        #expect(PickGoal.highProtein.top(in: day(items), avoiding: []).map(\.name) == ["A", "B", "C", "D", "E"])
+        #expect(PickGoal.leanProtein.top(in: day(items.reversed()), avoiding: []).map(\.name) == ["A", "B", "C", "D", "E"])
+        #expect(PickGoal.highProtein.top(in: day([item("Bad", protein: .infinity)]), avoiding: []).isEmpty)
     }
     @Test func groupOnlyWhenItAddsInformation() {
         let pair = day([item("Cheesesteak", protein: 26, calories: 449), item("Tots", protein: 1, calories: 110)])
-        #expect(!ProteinRanking.perServing.showsGroup(in: pair, avoiding: []))
+        #expect(!PickGoal.highProtein.showsGroup(in: pair, avoiding: []))
         let seven = day((1...7).map { item("Item \($0)", protein: Double($0), calories: 100) })
-        #expect(!ProteinRanking.perServing.showsGroup(in: seven, avoiding: []))
+        #expect(!PickGoal.highProtein.showsGroup(in: seven, avoiding: []))
         // Eight ranked items in a nine-item menu: the group of five is most of the menu.
         let nine = day((1...8).map { item("Item \($0)", protein: Double($0), calories: 100) } + [item("Water")])
-        #expect(!ProteinRanking.perServing.showsGroup(in: nine, avoiding: []))
+        #expect(!PickGoal.highProtein.showsGroup(in: nine, avoiding: []))
         let ten = day((1...8).map { item("Item \($0)", protein: Double($0), calories: 100) } + [item("Water"), item("Juice")])
-        #expect(ProteinRanking.perServing.showsGroup(in: ten, avoiding: []))
+        #expect(PickGoal.highProtein.showsGroup(in: ten, avoiding: []))
         // Unranked items (no protein data) do not count toward the minimum.
         let sparse = day((1...4).map { item("Item \($0)", protein: Double($0), calories: 100) } + (1...30).map { item("Plain \($0)") })
-        #expect(!ProteinRanking.perServing.showsGroup(in: sparse, avoiding: []))
+        #expect(!PickGoal.highProtein.showsGroup(in: sparse, avoiding: []))
     }
     @Test func singleSourceMigrationAndLegacyDecoding() throws {
         let old = Data(#"{"district":"middlesex","school":{"slug":"middlesex-high","name":"Middlesex High","menuTypes":[]},"menuType":{"slug":"lunch","name":"Lunch"}}"#.utf8)
@@ -136,7 +136,7 @@ struct FoodProCacheTests {
         let repo = MenuRepository(client: NutrisliceClient(loader: loader), cache: MenuCache(directory: nil), foodPro: provider)
         let result = try await repo.week(source: source, containing: date)
         let enriched = try await provider.enriched(result.week.day(date)!, source: source)
-        #expect(!ProteinRanking.perServing.top(in: enriched, avoiding: []).isEmpty)
+        #expect(!PickGoal.highProtein.top(in: enriched, avoiding: []).isEmpty)
         let cold = loader.requests.count
         #expect(cold == 1 + Int(ceil(Double(Set(enriched.items.map(\.foodID)).count) / 100)))
         _ = try await repo.week(source: source, containing: date)

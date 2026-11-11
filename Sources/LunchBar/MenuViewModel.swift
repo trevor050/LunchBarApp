@@ -125,21 +125,21 @@ final class MenuViewModel {
         sourceDidChange()
     }
 
-    var topProteinItems: [MenuItem] {
+    var topPicks: [MenuItem] {
         guard case .menu(var day) = phase else { return [] }
         if source?.provider == .rutgersFoodPro && !settings.avoidedAllergens.isEmpty {
             for i in day.sections.indices { day.sections[i].items.removeAll { !verifiedRecipes.contains($0.foodID) } }
         }
-        return settings.proteinRanking.top(in: day, avoiding: settings.avoidedAllergens)
+        return settings.pickGoal.top(in: day, avoiding: settings.avoidedAllergens)
     }
 
-    /// Whether the "Top protein" group earns its space: only when enough items have
+    /// Whether the "Top picks" group earns its space: only when enough items have
     /// protein data that a short list of the best ones is a real shortcut. While
     /// FoodPro nutrition is still loading for a large menu, keep its place.
-    var showsTopProtein: Bool {
+    var showsTopPicks: Bool {
         guard case .menu(let day) = phase else { return false }
         if nutritionLoading && source?.provider == .rutgersFoodPro && day.items.count >= 10 { return true }
-        return settings.proteinRanking.showsGroup(in: day, avoiding: settings.avoidedAllergens)
+        return settings.pickGoal.showsGroup(in: day, avoiding: settings.avoidedAllergens)
     }
 
     func sourceDidChange() {
@@ -226,8 +226,8 @@ final class MenuViewModel {
                 phase = .menu(enriched)
                 if !settings.avoidedAllergens.isEmpty {
                     // Report has no allergens: check labels in ranking order until
-                    // five safe choices are known. Unknown labels never enter Top protein.
-                    for candidate in settings.proteinRanking.top(in: enriched, avoiding: [], limit: enriched.items.count) {
+                    // five safe choices are known. Unknown labels never enter Top picks.
+                    for candidate in settings.pickGoal.top(in: enriched, avoiding: [], limit: enriched.items.count) {
                         guard !Task.isCancelled, generation == loadGeneration else { return }
                         _ = try await repository.foodPro.details(candidate, source: source, day: enriched.date)
                         guard !Task.isCancelled, generation == loadGeneration else { return }
@@ -235,7 +235,7 @@ final class MenuViewModel {
                         enriched = await repository.foodPro.applyingCached(to: enriched)
                         guard !Task.isCancelled, generation == loadGeneration, nutritionID == nutritionGeneration else { return }
                         phase = .menu(enriched)
-                        if topProteinItems.count >= 5 { break }
+                        if topPicks.count >= 5 { break }
                     }
                 }
             } catch {

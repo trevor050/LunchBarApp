@@ -192,7 +192,7 @@ struct DisplayTextTests {
                 entry("4", "ZA'ATAR HADDOCK", protein: 20),
             ], rawTitle: "LUNCH TAKEOUT")
         ])
-        let top = ProteinRanking.perServing.top(in: day, avoiding: [])
+        let top = PickGoal.highProtein.top(in: day, avoiding: [])
         #expect(top.map(\.providerName) == ["ROTISSERIE CHICKEN", "BBQ PULLED PORK", "BEEF STROGANOFF", "ZA'ATAR HADDOCK"])
         #expect(top.map(\.name) == ["Rotisserie Chicken", "BBQ Pulled Pork", "Beef Stroganoff", "Za'atar Haddock"])
         #expect(top.allSatisfy { $0.category == "Lunch Takeout" })

@@ -38,7 +38,9 @@ final class AppSettings {
     }
 
     var savedPlaces: [MenuSource] { didSet { save(savedPlaces, for: .savedPlaces) } }
-    var proteinRanking: ProteinRanking { didSet { defaults.set(proteinRanking.rawValue, forKey: Key.proteinRanking.rawValue) } }
+    /// What "Top picks" ranks by. One choice for all places: it describes the
+    /// person's goal, not the dining hall.
+    var pickGoal: PickGoal { didSet { defaults.set(pickGoal.rawValue, forKey: Key.pickGoal.rawValue) } }
     var stationExpansion: [String: Bool] { didSet { save(stationExpansion, for: .stationExpansion) } }
 
     var skipWeekends: Bool {
@@ -75,7 +77,11 @@ final class AppSettings {
         let legacySource = Self.load(MenuSource.self, defaults, .source)
         source = legacySource
         savedPlaces = SavedPlaces.migrate(saved: Self.load([MenuSource].self, defaults, .savedPlaces), legacy: legacySource)
-        proteinRanking = defaults.string(forKey: Key.proteinRanking.rawValue).flatMap(ProteinRanking.init(rawValue:)) ?? .perServing
+        // 2.x stored a two-mode protein ranking; it maps onto the first two goals.
+        // The old key is left in place so an older build still reads it.
+        pickGoal = defaults.string(forKey: Key.pickGoal.rawValue).flatMap(PickGoal.init(rawValue:))
+            ?? PickGoal.migrating(proteinRanking: defaults.string(forKey: Key.proteinRanking.rawValue))
+            ?? .highProtein
         stationExpansion = Self.load([String: Bool].self, defaults, .stationExpansion) ?? [:]
         skipWeekends = defaults.object(forKey: Key.skipWeekends.rawValue) as? Bool ?? true
         if defaults.bool(forKey: Key.hotKeyCleared.rawValue) {
@@ -108,7 +114,7 @@ final class AppSettings {
     // MARK: Persistence
 
     private enum Key: String {
-        case savedPlaces, proteinRanking, stationExpansion, source, skipWeekends, hotKey, hotKeyCleared, textSize, avoidedAllergens, favorites, notifyFavorites
+        case savedPlaces, proteinRanking, pickGoal, stationExpansion, source, skipWeekends, hotKey, hotKeyCleared, textSize, avoidedAllergens, favorites, notifyFavorites
     }
 
     private func save<T: Encodable>(_ value: T?, for key: Key) {
