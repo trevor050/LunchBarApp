@@ -381,7 +381,8 @@ struct RemoteImage: View {
 final class ImageStore {
     static let shared = ImageStore()
     @ObservationIgnored private let cache = NSCache<NSURL, NSImage>()
-    @ObservationIgnored private var inFlight: [URL: Task<NSImage?, Never>] = [:]
+    /// Downloads in progress. Tasks carry Data (Sendable); images are made on the main actor.
+    @ObservationIgnored private var inFlight: [URL: Task<Data?, Never>] = [:]
     /// URLs whose loaded image is large enough for a banner.
     private var photos: Set<URL> = []
 
@@ -395,19 +396,20 @@ final class ImageStore {
 
     func load(_ url: URL) async -> NSImage? {
         if let hit = cached(url) { return hit }
-        if let task = inFlight[url] { return await task.value }
-        let task = Task<NSImage?, Never> {
-            guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
-            return NSImage(data: data)
+        let task: Task<Data?, Never>
+        if let running = inFlight[url] {
+            task = running
+        } else {
+            task = Task { try? await URLSession.shared.data(from: url).0 }
+            inFlight[url] = task
         }
-        inFlight[url] = task
-        let image = await task.value
+        let data = await task.value
         inFlight[url] = nil
-        if let image {
-            cache.setObject(image, forKey: url as NSURL)
-            let width = image.representations.map(\.pixelsWide).max() ?? Int(image.size.width)
-            if width >= 320 { photos.insert(url) }
-        }
+        if let hit = cached(url) { return hit }
+        guard let data, let image = NSImage(data: data) else { return nil }
+        cache.setObject(image, forKey: url as NSURL)
+        let width = image.representations.map(\.pixelsWide).max() ?? Int(image.size.width)
+        if width >= 320 { photos.insert(url) }
         return image
     }
 }
