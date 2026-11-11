@@ -12,4 +12,4 @@ if [[ "${developer_dir}" == "/Library/Developer/CommandLineTools" && -d "${clt_f
     args+=(-Xswiftc -F"${clt_frameworks}" -Xswiftc -Xfrontend -Xswiftc -disable-cross-import-overlays -Xlinker -F"${clt_frameworks}" -Xlinker -rpath -Xlinker "${clt_frameworks}")
 fi
 
-exec swift test "${args[@]}" "$@"
+exec swift test ${args[@]+"${args[@]}"} "$@"
