@@ -1,59 +1,90 @@
 import LunchKit
 import SwiftUI
 
-/// Everything inside the menu bar popover.
-struct PopoverView: View {
+/// Everything inside the menu window: a fixed header, then the scrolling menu.
+///
+/// The view reports its natural height (header plus the full, unscrolled
+/// content) through `onNaturalHeight`. Content inside a `ScrollView` is laid
+/// out without a vertical limit, so the value never depends on the window's
+/// current height, and resizing the window cannot feed back into it.
+struct PanelView: View {
     @Bindable var model: MenuViewModel
     var openSettings: () -> Void
     var quit: () -> Void
-    var onSizeChange: (CGSize) -> Void = { _ in }
-    var onNavigation: () -> Void = {}
+    var onNaturalHeight: (CGFloat) -> Void = { _ in }
+    /// Lays the content out without a scroll view, for measuring and snapshots.
+    var measuring = false
 
-    /// The largest the popover gets. It shrinks to fit shorter menus.
-    static let size = CGSize(width: 360, height: 460)
-    /// Tallest the scrolling menu list may grow before it scrolls.
-    private static let maxListHeight: CGFloat = 372
     /// Height of the area used for loading, empty and error messages.
-    private static let messageHeight: CGFloat = 190
-
-    @State private var listHeight: CGFloat = 0
+    static let messageHeight: CGFloat = 190
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            content
-                .frame(maxWidth: .infinity)
-                .frame(height: bodyHeight)
-            footer
+        Group {
+            if measuring {
+                VStack(spacing: 0) {
+                    chrome
+                    content
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 0) {
+                    chrome
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(heightReader(ChromeHeightKey.self))
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            content
+                                .id(ScrollTop.id)
+                                .background(heightReader(ContentHeightKey.self))
+                        }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .onChange(of: model.day) { proxy.scrollTo(ScrollTop.id, anchor: .top) }
+                        .onChange(of: model.source?.key) { proxy.scrollTo(ScrollTop.id, anchor: .top) }
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top)
+                .onPreferenceChange(ChromeHeightKey.self) { chromeHeight = $0; report() }
+                .onPreferenceChange(ContentHeightKey.self) { height in
+                    contentHeight = height
+                    if model.phase != .loading { model.lastContentHeight = height }
+                    report()
+                }
+            }
         }
-        .frame(width: Self.size.width)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(GeometryReader { proxy in
-            Color.clear.preference(key: PopoverSizeKey.self, value: proxy.size)
-        })
-        .onPreferenceChange(PopoverSizeKey.self) { onSizeChange($0) }
-        .onChange(of: model.day) { onNavigation() }
-        .onPreferenceChange(MenuListHeightKey.self) { listHeight = $0 }
+        .frame(width: PanelGeometry.width)
         .environment(\.textScale, model.settings.textSize.scale)
     }
 
-    /// The menu list is as tall as its rows, up to a cap; other states use a compact fixed height.
-    private var bodyHeight: CGFloat {
-        if case .menu = model.phase {
-            return min(max(listHeight, 52), Self.maxListHeight)
+    @State private var chromeHeight: CGFloat = 0
+    @State private var contentHeight: CGFloat = 0
+
+    private func report() {
+        guard chromeHeight > 0, contentHeight > 0 else { return }
+        onNaturalHeight(ceil(chromeHeight + contentHeight))
+    }
+
+    private func heightReader<Key: PreferenceKey>(_ key: Key.Type) -> some View where Key.Value == CGFloat {
+        GeometryReader { proxy in Color.clear.preference(key: key, value: proxy.size.height) }
+    }
+
+    private var chrome: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
         }
-        return Self.messageHeight
     }
 
     // MARK: Header
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(DayTitle.title(for: model.day, today: model.today))
                         .scaledFont(.title2, weight: .semibold)
+                        .lineLimit(1)
+                        .layoutPriority(1)
                     Text(DayTitle.subtitle(for: model.day, today: model.today))
                         .scaledFont(.body)
                         .foregroundStyle(.secondary)
@@ -61,13 +92,21 @@ struct PopoverView: View {
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
-                sourceMenu
+                HStack(spacing: 6) {
+                    sourceMenu
+                    ProgressView()
+                        .controlSize(.mini)
+                        .opacity(model.isRefreshing ? 1 : 0)
+                        .accessibilityHidden(!model.isRefreshing)
+                        .accessibilityLabel("Updating menu")
+                }
             }
             Spacer(minLength: 0)
             navigation
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
+        .padding(.top, 12)
         .padding(.bottom, 10)
     }
 
@@ -79,8 +118,8 @@ struct PopoverView: View {
                     ForEach(model.settings.savedPlaces, id: \.placeKey) { place in
                         Button { model.select(place: place) } label: {
                             if place.placeKey == source.placeKey {
-                                Label(place.school.name + (place.provider == .rutgersFoodPro ? " · FoodPro" : place.district == "rutgers" ? " · Current" : ""), systemImage: "checkmark")
-                            } else { Text(place.school.name + (place.provider == .rutgersFoodPro ? " · FoodPro" : place.district == "rutgers" ? " · Current" : "")) }
+                                Label(Self.placeName(place), systemImage: "checkmark")
+                            } else { Text(Self.placeName(place)) }
                         }
                     }
                     Button("Add Place…", action: openSettings)
@@ -101,33 +140,80 @@ struct PopoverView: View {
                 .scaledFont(.subheadline).foregroundStyle(.secondary)
             }
             .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)
+            .fixedSize(horizontal: false, vertical: true)
             .help("\(source.school.name) · \(source.menuType.name), switch saved place or meal")
             .accessibilityLabel("\(source.school.name), \(source.menuType.name), switch place or meal")
         }
     }
 
+    private static func placeName(_ place: MenuSource) -> String {
+        place.school.name + (place.provider == .rutgersFoodPro ? " · FoodPro" : place.district == "rutgers" ? " · Current" : "")
+    }
+
     private var navigation: some View {
-        HStack(spacing: 2) {
-            NavButton(systemImage: "chevron.left", label: "Previous day", shortcut: .leftArrow) {
-                model.showPrevious()
+        HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                IconButton(systemImage: "chevron.left", label: "Previous day", shortcut: .leftArrow) { model.showPrevious() }
+                Button("Today") { model.showToday() }
+                    .buttonStyle(.borderless)
+                    .scaledFont(.subheadline, weight: .medium)
+                    .keyboardShortcut("t", modifiers: [])
+                    .disabled(model.isShowingDefaultDay)
+                    .help("Go to today (T)")
+                    .padding(.horizontal, 2)
+                IconButton(systemImage: "chevron.right", label: "Next day", shortcut: .rightArrow) { model.showNext() }
             }
-            Button("Today") { model.showToday() }
-                .buttonStyle(.borderless)
-                .scaledFont(.subheadline, weight: .medium)
-                .keyboardShortcut("t", modifiers: [])
-                .disabled(model.isShowingDefaultDay)
-                .help("Go to today (T)")
-            NavButton(systemImage: "chevron.right", label: "Next day", shortcut: .rightArrow) {
-                model.showNext()
-            }
+            .disabled(model.source == nil)
+            moreMenu
         }
-        .disabled(model.source == nil)
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Button("Refresh") { model.refresh() }
+                .keyboardShortcut("r")
+            if let url = model.source?.webURL(on: model.day) {
+                Button("Open Published Menu") { NSWorkspace.shared.open(url) }
+            }
+            Divider()
+            Button("Settings…", action: openSettings)
+                .keyboardShortcut(",")
+            Button("Quit LunchBar", action: quit)
+                .keyboardShortcut("q")
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 26, height: 24)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel("More")
+        .help("Refresh, settings and quit")
     }
 
     // MARK: Content
 
     @ViewBuilder
     private var content: some View {
+        VStack(spacing: 0) {
+            if let notice = model.staleNotice {
+                Label(notice, systemImage: "exclamationmark.triangle")
+                    .labelStyle(.titleAndIcon)
+                    .scaledFont(.caption1)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 8)
+            }
+            phaseContent
+        }
+    }
+
+    @ViewBuilder
+    private var phaseContent: some View {
         switch model.phase {
         case .needsSetup:
             StateMessage(
@@ -138,12 +224,17 @@ struct PopoverView: View {
                 action: openSettings
             )
         case .loading:
+            // Keep the previous content's height while loading, so switching days
+            // resizes the window once (to the new menu), not twice.
             ProgressView()
                 .controlSize(.small)
+                .frame(maxWidth: .infinity)
+                .frame(height: model.lastContentHeight > 0 ? model.lastContentHeight : Self.messageHeight)
                 .accessibilityLabel("Loading menu")
         case .menu(let day):
             MenuListView(day: day, settings: model.settings, expanded: $model.expandedItemID,
-                         topItems: model.topProteinItems, nutritionLoading: model.nutritionLoading,
+                         topItems: model.topProteinItems, showsTop: model.showsTopProtein,
+                         nutritionLoading: model.nutritionLoading,
                          nutritionNotice: model.nutritionNotice, verifiedRecipes: model.verifiedRecipes, filter: $model.menuFilter)
                 .onChange(of: model.expandedItemID) { _, id in model.loadDetails(id) }
                 .onChange(of: model.settings.proteinRanking) { model.loadNutrition() }
@@ -193,51 +284,23 @@ struct PopoverView: View {
                          actionTitle: "Try Again", action: model.refresh)
         }
     }
-
-    // MARK: Footer
-
-    private var footer: some View {
-        HStack(spacing: 8) {
-            if let notice = model.staleNotice {
-                Label(notice, systemImage: "exclamationmark.triangle")
-                    .labelStyle(.titleAndIcon)
-                    .scaledFont(.caption1)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            } else if model.isRefreshing {
-                ProgressView().controlSize(.mini)
-                Text("Updating…").scaledFont(.caption1).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            Menu {
-                Button("Refresh") { model.refresh() }
-                    .keyboardShortcut("r")
-                if let url = model.source?.webURL(on: model.day) {
-                    Button("Open Published Menu") { NSWorkspace.shared.open(url) }
-                }
-                Divider()
-                Button("Settings…", action: openSettings)
-                    .keyboardShortcut(",")
-                Button("Quit LunchBar", action: quit)
-                    .keyboardShortcut("q")
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .imageScale(.large)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .accessibilityLabel("More")
-            .help("Refresh, settings and quit")
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(minHeight: 34)
-    }
 }
 
-private struct NavButton: View {
+private enum ScrollTop { static let id = "panel-top" }
+
+/// Height of the fixed header.
+private struct ChromeHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Height of the unscrolled content (laid out without a vertical limit).
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+private struct IconButton: View {
     let systemImage: String
     let label: String
     let shortcut: KeyEquivalent
@@ -267,9 +330,9 @@ struct StateMessage: View {
     var action: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 30, weight: .light))
+                .font(.system(size: 28, weight: .light))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Text(title)
@@ -287,6 +350,8 @@ struct StateMessage: View {
             }
         }
         .padding(.horizontal, 32)
+        .padding(.vertical, 24)
+        .frame(maxWidth: .infinity, minHeight: PanelView.messageHeight)
         .accessibilityElement(children: .contain)
     }
 }
@@ -309,14 +374,5 @@ enum DayTitle {
             return date.formatted(.dateTime.month(.abbreviated).day().year())
         }
         return date.formatted(.dateTime.month(.abbreviated).day())
-    }
-}
-
-/// Natural size only. AppDelegate owns when AppKit is allowed to apply it.
-private struct PopoverSizeKey: PreferenceKey {
-    static let defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        let next = nextValue()
-        value = CGSize(width: max(value.width, next.width), height: max(value.height, next.height))
     }
 }

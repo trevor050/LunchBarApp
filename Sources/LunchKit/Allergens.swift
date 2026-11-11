@@ -36,7 +36,7 @@ public enum Allergen: String, CaseIterable, Codable, Sendable, Identifiable {
         }
     }
 
-    func matches(_ label: String) -> Bool {
+    public func matches(_ label: String) -> Bool {
         let text = label.lowercased()
         if self == .fish, text.contains("shellfish"), !text.replacingOccurrences(of: "shellfish", with: "").contains("fish") {
             return false

@@ -87,6 +87,20 @@ struct ProteinTests {
         #expect(ProteinRanking.per100Calories.top(in: day(items.reversed()), avoiding: []).map(\.name) == ["A", "B", "C", "D", "E"])
         #expect(ProteinRanking.perServing.top(in: day([item("Bad", protein: .infinity)]), avoiding: []).isEmpty)
     }
+    @Test func groupOnlyWhenItAddsInformation() {
+        let pair = day([item("Cheesesteak", protein: 26, calories: 449), item("Tots", protein: 1, calories: 110)])
+        #expect(!ProteinRanking.perServing.showsGroup(in: pair, avoiding: []))
+        let seven = day((1...7).map { item("Item \($0)", protein: Double($0), calories: 100) })
+        #expect(!ProteinRanking.perServing.showsGroup(in: seven, avoiding: []))
+        // Eight ranked items in a nine-item menu: the group of five is most of the menu.
+        let nine = day((1...8).map { item("Item \($0)", protein: Double($0), calories: 100) } + [item("Water")])
+        #expect(!ProteinRanking.perServing.showsGroup(in: nine, avoiding: []))
+        let ten = day((1...8).map { item("Item \($0)", protein: Double($0), calories: 100) } + [item("Water"), item("Juice")])
+        #expect(ProteinRanking.perServing.showsGroup(in: ten, avoiding: []))
+        // Unranked items (no protein data) do not count toward the minimum.
+        let sparse = day((1...4).map { item("Item \($0)", protein: Double($0), calories: 100) } + (1...30).map { item("Plain \($0)") })
+        #expect(!ProteinRanking.perServing.showsGroup(in: sparse, avoiding: []))
+    }
     @Test func singleSourceMigrationAndLegacyDecoding() throws {
         let old = Data(#"{"district":"middlesex","school":{"slug":"middlesex-high","name":"Middlesex High","menuTypes":[]},"menuType":{"slug":"lunch","name":"Lunch"}}"#.utf8)
         let source = try JSONDecoder().decode(MenuSource.self, from: old)

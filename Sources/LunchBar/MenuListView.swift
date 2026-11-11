@@ -1,90 +1,74 @@
+import AppKit
 import LunchKit
 import SwiftUI
 
-/// Reports the natural height of the menu rows so the popover can size itself to fit.
-struct MenuListHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
+/// The day's menu: optional "Top protein" group, then stations of items.
+/// Lays out at its natural height; the panel puts it in a scroll view.
 struct MenuListView: View {
     let day: MenuDay
     let settings: AppSettings
     @Binding var expanded: String?
     var topItems: [MenuItem] = []
+    var showsTop = false
     var nutritionLoading = false
     var nutritionNotice: String?
     var verifiedRecipes: Set<String> = []
     @Binding var filter: String
-    @State private var visibleTop: [MenuItem] = []
-    @State private var hoveringTop = false
+    /// Frozen copy of the Top protein rows while the pointer is over the list;
+    /// nil means "show `topItems` as they are".
+    @State private var visibleTop: [MenuItem]?
     @State private var hoveringMenu = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var large: Bool { day.items.count > 25 }
     private var foodPro: Bool { settings.source?.provider == .rutgersFoodPro }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if large {
-                    TextField("Filter menu", text: $filter, prompt: Text("Filter \(day.items.count) items"))
-                        .textFieldStyle(.roundedBorder).padding(.horizontal, 12).padding(.top, 10)
-                        .accessibilityLabel("Filter items by name")
-                }
-                if filter.isEmpty && (!visibleTop.isEmpty || nutritionLoading || !topItems.isEmpty) {
-                    proteinGroup
-                }
-                if let nutritionNotice {
-                    Text(nutritionNotice).scaledFont(.caption1).foregroundStyle(.secondary)
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                }
-                ForEach(day.sections) { section in
-                    let matches = section.items.filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
-                    if !matches.isEmpty {
-                        let key = (settings.source?.key ?? "") + "/" + (section.title ?? section.id)
-                        let open = !filter.isEmpty || (settings.stationExpansion[key] ?? !large)
-                        if let title = section.title {
-                            Button {
-                                settings.stationExpansion[key] = !open
-                            } label: {
-                                HStack {
-                                    Text(title).lineLimit(2)
-                                    Spacer()
-                                    Text("\(matches.count)").monospacedDigit()
-                                    Image(systemName: open ? "chevron.down" : "chevron.right").font(.system(size: 9))
-                                }
-                                .scaledFont(.subheadline, weight: .semibold).foregroundStyle(.secondary)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain).padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 5)
-                            .accessibilityLabel("\(title), \(matches.count) items")
-                            .accessibilityValue(open ? "Expanded" : "Collapsed")
-                        }
-                        if open || section.title == nil {
-                            ForEach(matches) { item in row(item) }
+        VStack(alignment: .leading, spacing: 0) {
+            if large {
+                TextField("Filter menu", text: $filter, prompt: Text("Filter \(day.items.count) items"))
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 2)
+                    .accessibilityLabel("Filter items by name")
+            }
+            if filter.isEmpty && showsTop {
+                proteinGroup
+            }
+            if let nutritionNotice {
+                Text(nutritionNotice).scaledFont(.caption1).foregroundStyle(.secondary)
+                    .padding(.horizontal, 14).padding(.vertical, 6)
+            }
+            ForEach(day.sections) { section in
+                let matches = section.items.filter { filter.isEmpty || $0.name.localizedCaseInsensitiveContains(filter) }
+                if !matches.isEmpty {
+                    // Keyed on the provider's own title: display casing may change.
+                    let key = (settings.source?.key ?? "") + "/" + (section.providerTitle ?? section.id)
+                    let open = !filter.isEmpty || (settings.stationExpansion[key] ?? !large)
+                    let photos = section.items.contains { $0.imageURL != nil }
+                    if let title = section.title {
+                        SectionHeader(title: title, count: matches.count, open: open) {
+                            settings.stationExpansion[key] = !open
                         }
                     }
-                }
-                if !filter.isEmpty && !day.items.contains(where: { $0.name.localizedCaseInsensitiveContains(filter) }) {
-                    Text("No matching items").scaledFont(.body).foregroundStyle(.secondary).padding(16)
+                    if open || section.title == nil {
+                        ForEach(matches) { item in row(item, photos: photos) }
+                    }
                 }
             }
-            .padding(.bottom, 8)
-            .background(GeometryReader { proxy in Color.clear.preference(key: MenuListHeightKey.self, value: proxy.size.height) })
+            if !filter.isEmpty && !day.items.contains(where: { $0.name.localizedCaseInsensitiveContains(filter) }) {
+                Text("No items match “\(filter)”").scaledFont(.body).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).padding(.vertical, 24)
+            }
         }
-        .scrollIndicators(.automatic)
-        .onAppear { visibleTop = topItems }
+        .padding(.bottom, 8)
         .onHover { inside in
             hoveringMenu = inside
-            if !inside && expanded == nil { visibleTop = topItems }
+            if !inside && expanded == nil { visibleTop = nil }
         }
-        .onChange(of: topItems) { _, items in
+        .onChange(of: topItems) { old, _ in
             // Keep names under the pointer (and an expanded row) stable during enrichment.
-            if !hoveringMenu && expanded == nil { visibleTop = items }
+            if !hoveringMenu && expanded == nil { visibleTop = nil }
             else {
-                visibleTop = visibleTop.compactMap { old in
+                visibleTop = (visibleTop ?? old).compactMap { old in
                     guard var current = day.items.first(where: { $0.id == old.id }) else { return nil }
                     guard current.warnings(avoiding: settings.avoidedAllergens).isEmpty else { return nil }
                     current.category = old.category
@@ -93,159 +77,232 @@ struct MenuListView: View {
             }
         }
         .onChange(of: expanded) { _, id in
-            if id == nil && !hoveringMenu { visibleTop = topItems }
+            if id == nil && !hoveringMenu { visibleTop = nil }
         }
-        .onChange(of: day.date) { filter = ""; visibleTop = topItems }
-        .onChange(of: settings.source?.key) { filter = ""; visibleTop = topItems }
+        .onChange(of: day.date) { filter = ""; visibleTop = nil }
+        .onChange(of: settings.source?.key) { filter = ""; visibleTop = nil }
     }
 
     private var proteinGroup: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Text("Top protein · \(settings.proteinRanking.heading)").scaledFont(.subheadline, weight: .semibold)
+                Text("Top protein")
+                Text(settings.proteinRanking.heading).foregroundStyle(.tertiary)
                 if nutritionLoading { ProgressView().controlSize(.mini).accessibilityLabel("Loading published nutrition") }
                 Spacer()
-            }.padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 4)
-            if visibleTop.isEmpty {
-                Text(nutritionLoading ? "Checking published nutrition…" : "Top choices ready").scaledFont(.caption1).foregroundStyle(.secondary)
-                    .padding(.horizontal, 16).frame(height: 44)
-            } else {
-                ForEach(visibleTop) { item in row(item, protein: settings.proteinRanking) }
             }
-            Divider().padding(.top, 6)
+            .scaledFont(.subheadline, weight: .semibold)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
+            .accessibilityAddTraits(.isHeader)
+            let shown = visibleTop ?? topItems
+            if shown.isEmpty {
+                Text(nutritionLoading ? "Checking published nutrition…" : "No ranked items")
+                    .scaledFont(.caption1).foregroundStyle(.secondary)
+                    .padding(.horizontal, 14).frame(height: 40)
+            } else {
+                let photos = shown.contains { $0.imageURL != nil }
+                ForEach(shown) { item in row(item, photos: photos, protein: settings.proteinRanking) }
+            }
         }
-        .onHover { inside in
-            hoveringTop = inside
-            if !inside && !hoveringMenu && expanded == nil { visibleTop = topItems }
-        }
+        .padding(.bottom, 4)
     }
 
-    private func row(_ item: MenuItem, protein: ProteinRanking? = nil) -> some View {
-        MenuItemRow(item: item, warnings: item.warnings(avoiding: settings.avoidedAllergens),
+    private func row(_ item: MenuItem, photos: Bool, protein: ProteinRanking? = nil) -> some View {
+        MenuItemRow(item: item, avoided: settings.avoidedAllergens,
                     isFavorite: settings.isFavorite(item), isExpanded: expanded == item.id,
+                    showsPhoto: photos,
                     toggleExpanded: { toggle(item) }, toggleFavorite: { settings.toggleFavorite(item) },
                     proteinMode: protein, unknownAllergens: foodPro && !verifiedRecipes.contains(item.foodID))
     }
+
     private func toggle(_ item: MenuItem) {
         let change = { expanded = expanded == item.id ? nil : item.id }
-        if reduceMotion { change() } else { withAnimation(.snappy(duration: 0.2), change) }
+        if reduceMotion { change() } else { withAnimation(.snappy(duration: 0.22), change) }
+    }
+}
+
+/// A quiet, clickable station title with its item count.
+private struct SectionHeader: View {
+    let title: String
+    let count: Int
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack(spacing: 6) {
+                Text(title).lineLimit(2)
+                Spacer(minLength: 8)
+                Text("\(count)").monospacedDigit().foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .rotationEffect(.degrees(open ? 90 : 0))
+                    .foregroundStyle(.tertiary)
+            }
+            .scaledFont(.subheadline, weight: .semibold)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 14).padding(.top, 9).padding(.bottom, 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title), \(count) items")
+        .accessibilityValue(open ? "Expanded" : "Collapsed")
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Formats the figures shown on rows and in details.
+enum Figures {
+    static func grams(_ value: Double) -> String {
+        if value >= 10 || value == value.rounded() { return "\(Int(value.rounded())) g" }
+        return String(format: "%.1f g", value)
+    }
+
+    static func nutrient(_ item: MenuItem, _ names: String...) -> Double? {
+        item.nutrition.first { nutrient in names.contains(nutrient.name.lowercased()) && nutrient.unit == "g" }?.amount
     }
 }
 
 struct MenuItemRow: View {
     let item: MenuItem
-    let warnings: [AllergenWarning]
+    let avoided: Set<Allergen>
     let isFavorite: Bool
     let isExpanded: Bool
+    let showsPhoto: Bool
     let toggleExpanded: () -> Void
     let toggleFavorite: () -> Void
     var proteinMode: ProteinRanking? = nil
     var unknownAllergens = false
 
     @State private var isHovering = false
+    @Namespace private var photoSpace
     @Environment(\.textScale) private var scale
+
+    private var warnings: [AllergenWarning] { item.warnings(avoiding: avoided) }
+    private var thumbnail: CGFloat { (48 * min(scale, 1.15)).rounded() }
+    private var largePhoto: Bool { isExpanded && item.imageURL != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 10) {
-                Button(action: toggleExpanded) {
-                    HStack(alignment: .top, spacing: 10) {
-                        thumbnail
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(item.name)
-                                .scaledFont(.body, weight: .medium)
-                                .foregroundStyle(.primary)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if proteinMode != nil {
-                                Text([item.calories.map { "\($0) cal" }, item.category].compactMap { $0 }.joined(separator: " · "))
-                                    .scaledFont(.caption1).foregroundStyle(.secondary).multilineTextAlignment(.leading)
-                                if proteinMode == .per100Calories, let score = proteinMode?.score(item) {
-                                    Text(String(format: "%.1f g / 100 cal", score)).scaledFont(.caption1).foregroundStyle(.secondary)
-                                }
-                            } else { summary }
-                        }
-                        Spacer(minLength: 0)
-                        if proteinMode != nil, let protein = item.protein {
-                            Text(String(format: "%.1f g", protein))
-                                .scaledFont(.title3, weight: .semibold).monospacedDigit().foregroundStyle(.primary)
-                        }
-                    }
-                    .contentShape(Rectangle())
+            Button(action: toggleExpanded) {
+                Group {
+                    if largePhoto { expandedHeader } else { compactHeader }
                 }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(accessibilityLabel)
-                .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint("Shows nutrition and allergen details")
-                .accessibilityAction(named: isFavorite ? "Remove from favorites" : "Add to favorites", toggleFavorite)
-
-                Button(action: toggleFavorite) {
-                    Image(systemName: isFavorite ? "star.fill" : "star")
-                        .foregroundStyle(isFavorite ? Color.yellow : Color.secondary)
-                        .font(.system(size: 13 * scale))
-                        .frame(width: 22, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-                .opacity(isFavorite || isHovering || isExpanded ? 1 : 0)
-                .accessibilityLabel(isFavorite ? "Remove \(item.name) from favorites" : "Add \(item.name) to favorites")
-                .help(isFavorite ? "Remove from favorites" : "Favorite: get notified when it's on the menu")
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint("Shows nutrition and allergen details")
+            .accessibilityAction(named: isFavorite ? "Remove from favorites" : "Add to favorites", toggleFavorite)
 
             if isExpanded {
-                if unknownAllergens {
-                    Text("Allergens not checked yet. Check the published label before eating.")
-                        .scaledFont(.caption1).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.bottom, 6)
-                }
-                ItemDetailView(item: item)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
+                ItemDetailView(item: item, avoided: avoided, unknownAllergens: unknownAllergens,
+                               isFavorite: isFavorite, toggleFavorite: toggleFavorite)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 14)
                     .transition(.opacity)
             }
         }
-        .background(isHovering || isExpanded ? Color.primary.opacity(0.05) : Color.clear)
+        .background(isExpanded ? Color.primary.opacity(0.045) : isHovering ? Color.primary.opacity(0.04) : .clear)
         .onHover { isHovering = $0 }
-    }
-
-    @ViewBuilder
-    private var thumbnail: some View {
-        if let url = item.imageURL {
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } else {
-                    Color.primary.opacity(0.06)
-                }
-            }
-            .frame(width: 36 * scale, height: 36 * scale)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .accessibilityHidden(true)
+        .contextMenu {
+            Button(isFavorite ? "Remove from Favorites" : "Add to Favorites", action: toggleFavorite)
+            Button(isExpanded ? "Hide Details" : "Show Details", action: toggleExpanded)
         }
     }
 
-    /// One quiet line under the name: allergen warning first (it matters most),
-    /// then calories and dietary highlights.
+    private var compactHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            if showsPhoto {
+                FoodPhoto(url: item.imageURL)
+                    .matchedGeometryEffect(id: "photo", in: photoSpace)
+                    .frame(width: thumbnail, height: thumbnail)
+            }
+            nameBlock
+            Spacer(minLength: 8)
+            figure.opacity(isExpanded ? 0 : 1)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, showsPhoto ? 6 : 8)
+    }
+
+    private var expandedHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            FoodPhoto(url: item.imageURL)
+                .matchedGeometryEffect(id: "photo", in: photoSpace)
+                .frame(maxWidth: .infinity)
+                .frame(height: 176)
+            nameBlock
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+    }
+
+    private var nameBlock: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(item.name)
+                    .scaledFont(largePhoto ? .headline : .body, weight: largePhoto ? .semibold : .medium)
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                if isFavorite {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 9 * scale))
+                        .foregroundStyle(.yellow)
+                        .accessibilityHidden(true)
+                }
+            }
+            secondaryLine
+        }
+    }
+
+    /// One quiet line: an avoided-allergen warning first (it matters most), then
+    /// dietary highlights, or the station for the Top protein group.
     @ViewBuilder
-    private var summary: some View {
-        let details = (item.calories.map { ["\($0) cal"] } ?? []) + item.dietaryTags.prefix(2)
-        if !warnings.isEmpty || !details.isEmpty {
+    private var secondaryLine: some View {
+        let context: [String] = proteinMode != nil
+            ? [item.category, proteinMode == .per100Calories ? proteinMode?.score(item).map { String(format: "%.1f g / 100 cal", $0) } : nil].compactMap { $0 }
+            : Array(item.dietaryTags.prefix(2))
+        // Expanded details flag avoided allergens themselves.
+        let warnings = isExpanded ? [] : warnings
+        if !warnings.isEmpty || !context.isEmpty {
             HStack(spacing: 6) {
                 if !warnings.isEmpty {
                     Label(warningText, systemImage: "exclamationmark.triangle.fill")
                         .labelStyle(.titleAndIcon)
                         .foregroundStyle(.orange)
+                        .fontWeight(.medium)
                 }
-                if !details.isEmpty {
-                    Text(details.joined(separator: " · "))
-                        .foregroundStyle(.secondary)
+                if !context.isEmpty {
+                    Text(context.joined(separator: " · ")).foregroundStyle(.secondary)
                 }
             }
             .scaledFont(.caption1)
             .lineLimit(1)
         }
+    }
+
+    /// The right-hand column: calories, or protein over calories in the Top protein group.
+    @ViewBuilder
+    private var figure: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            if proteinMode != nil, let protein = item.protein {
+                Text(Figures.grams(protein)).scaledFont(.body, weight: .semibold)
+                Text(item.calories.map { "\($0) cal" } ?? "protein")
+                    .scaledFont(.caption1).foregroundStyle(.secondary)
+            } else if let calories = item.calories {
+                Text("\(calories)").scaledFont(.body, weight: .semibold)
+                Text("cal").scaledFont(.caption1).foregroundStyle(.secondary)
+            }
+        }
+        .monospacedDigit()
+        .frame(minWidth: 44 * scale, alignment: .trailing)
+        .accessibilityHidden(true)
     }
 
     private var warningText: String {
@@ -255,7 +312,7 @@ struct MenuItemRow: View {
 
     private var accessibilityLabel: String {
         var parts = [item.name]
-        if let protein = item.protein, proteinMode != nil { parts.append("\(protein) grams protein") }
+        if let protein = item.protein, proteinMode != nil { parts.append("\(Figures.grams(protein).replacingOccurrences(of: " g", with: "")) grams protein") }
         if let calories = item.calories { parts.append("\(calories) calories") }
         parts += item.dietaryTags
         if !warnings.isEmpty {
@@ -266,81 +323,251 @@ struct MenuItemRow: View {
     }
 }
 
-struct ItemDetailView: View {
-    let item: MenuItem
+/// A food photo cropped to a rounded square or banner. Items without a photo get
+/// a quiet glyph so rows in a section with photos still line up.
+struct FoodPhoto: View {
+    let url: URL?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // The rectangle takes the proposed size; the photo fills it and is cropped.
+        Rectangle()
+            .fill(Color.primary.opacity(0.06))
+            .overlay {
+                if let url {
+                    RemoteImage(url: url)
+                } else {
+                    Image(systemName: "fork.knife")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.5))
+            .accessibilityHidden(true)
+    }
+}
+
+/// Shows a cached image immediately (no placeholder flash when a row expands)
+/// and loads it once otherwise.
+struct RemoteImage: View {
+    let url: URL
+    @State private var image: NSImage?
+
+    init(url: URL) {
+        self.url = url
+        _image = State(initialValue: ImageStore.shared.cached(url))
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().scaledToFill()
+            } else {
+                Color.clear
+            }
+        }
+        .task(id: url) {
+            if image == nil { image = await ImageStore.shared.load(url) }
+        }
+    }
+}
+
+@MainActor
+final class ImageStore {
+    static let shared = ImageStore()
+    private let cache = NSCache<NSURL, NSImage>()
+    private var inFlight: [URL: Task<NSImage?, Never>] = [:]
+
+    init() { cache.countLimit = 300 }
+
+    func cached(_ url: URL) -> NSImage? { cache.object(forKey: url as NSURL) }
+
+    func load(_ url: URL) async -> NSImage? {
+        if let hit = cached(url) { return hit }
+        if let task = inFlight[url] { return await task.value }
+        let task = Task<NSImage?, Never> {
+            guard let (data, _) = try? await URLSession.shared.data(from: url) else { return nil }
+            return NSImage(data: data)
+        }
+        inFlight[url] = task
+        let image = await task.value
+        inFlight[url] = nil
+        if let image { cache.setObject(image, forKey: url as NSURL) }
+        return image
+    }
+}
+
+/// Details under an expanded row: macros at a glance, allergens and diet, then
+/// the description and full label for anyone who wants them.
+struct ItemDetailView: View {
+    let item: MenuItem
+    let avoided: Set<Allergen>
+    var unknownAllergens = false
+    let isFavorite: Bool
+    let toggleFavorite: () -> Void
+    @State private var showsLabel = false
+    @State private var showsIngredients = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if !macros.isEmpty { macroRow }
+            facts
             if let description = item.description {
                 Text(description)
                     .scaledFont(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if !item.allergens.isEmpty {
-                detail("Allergens", item.allergens.joined(separator: ", "))
+            if item.nutrition.count > 1 || item.ingredients != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    if item.nutrition.count > 1 {
+                        Disclosure(title: "Nutrition facts", isOpen: $showsLabel) { nutritionLabel }
+                    }
+                    if let ingredients = item.ingredients {
+                        Disclosure(title: "Ingredients", isOpen: $showsIngredients) {
+                            Text(ingredients)
+                                .scaledFont(.callout)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
             }
-            if !item.dietaryTags.isEmpty || !item.foodGroups.isEmpty {
-                detail("Highlights", (item.dietaryTags + item.foodGroups).joined(separator: ", "))
-            }
-            if let serving = item.servingSize {
-                detail("Serving", serving)
-            }
-            if !item.nutrition.isEmpty || item.calories != nil {
-                nutrition
-            }
-            if let ingredients = item.ingredients {
-                detail("Ingredients", ingredients)
-            }
-            if item.allergens.isEmpty && item.nutrition.isEmpty && item.ingredients == nil && item.description == nil {
+            if item.allergens.isEmpty && item.nutrition.isEmpty && item.calories == nil && item.ingredients == nil && item.description == nil {
                 Text("The cafeteria hasn't published details for this item.")
-                    .scaledFont(.callout)
-                    .foregroundStyle(.secondary)
+                    .scaledFont(.callout).foregroundStyle(.secondary)
             }
+            Button(action: toggleFavorite) {
+                Label(isFavorite ? "Favorite" : "Add to Favorites", systemImage: isFavorite ? "star.fill" : "star")
+                    .scaledFont(.subheadline, weight: .medium)
+            }
+            .buttonStyle(.borderless)
+            .tint(isFavorite ? .yellow : nil)
+            .help(isFavorite ? "Remove from favorites" : "Get notified when it's on the menu")
+            .accessibilityLabel(isFavorite ? "Remove \(item.name) from favorites" : "Add \(item.name) to favorites")
         }
         .accessibilityElement(children: .contain)
     }
 
-    private func detail(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .scaledFont(.caption1, weight: .semibold)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .scaledFont(.callout)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .combine)
+    private var macros: [(value: String, label: String)] {
+        var result: [(String, String)] = []
+        if let calories = item.calories { result.append(("\(calories)", "Calories")) }
+        if let protein = item.protein { result.append((Figures.grams(protein), "Protein")) }
+        if let carbs = Figures.nutrient(item, "total carbohydrate", "carbohydrates", "total carbohydrates") { result.append((Figures.grams(carbs), "Carbs")) }
+        if let fat = Figures.nutrient(item, "total fat", "fat") { result.append((Figures.grams(fat), "Fat")) }
+        return result
     }
 
-    private var nutrition: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Nutrition")
-                .scaledFont(.caption1, weight: .semibold)
-                .foregroundStyle(.secondary)
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
-                if let calories = item.calories {
-                    row("Calories", "\(calories)", bold: true)
+    private var macroRow: some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(macros, id: \.label) { macro in
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(macro.value).scaledFont(.title3, weight: .semibold).monospacedDigit()
+                    Text(macro.label).scaledFont(.caption1).foregroundStyle(.secondary)
                 }
-                ForEach(item.nutrition) { nutrient in
-                    row(nutrient.name, nutrient.formattedAmount, indent: nutrient.isSubRow)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var facts: some View {
+        let tags = item.dietaryTags
+        if !item.allergens.isEmpty || !tags.isEmpty || item.servingSize != nil || unknownAllergens {
+            Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 5) {
+                if !item.allergens.isEmpty {
+                    GridRow {
+                        factLabel("Allergens")
+                        allergenText.fixedSize(horizontal: false, vertical: true)
+                    }
+                } else if unknownAllergens {
+                    GridRow {
+                        factLabel("Allergens")
+                        Text("Not checked yet. Check the published label before eating.")
+                            .scaledFont(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if !tags.isEmpty {
+                    GridRow {
+                        factLabel("Diet")
+                        Text(tags.joined(separator: ", ")).scaledFont(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if let serving = item.servingSize {
+                    GridRow {
+                        factLabel("Serving")
+                        Text(serving).scaledFont(.callout)
+                    }
                 }
             }
         }
     }
 
-    private func row(_ name: String, _ value: String, bold: Bool = false, indent: Bool = false) -> some View {
-        GridRow {
-            Text(name)
-                .scaledFont(.callout, weight: bold ? .semibold : nil)
-                .padding(.leading, indent ? 12 : 0)
-                .foregroundStyle(indent ? .secondary : .primary)
-            Text(value)
-                .scaledFont(.callout, weight: bold ? .semibold : nil)
-                .monospacedDigit()
-                .gridColumnAlignment(.trailing)
+    private func factLabel(_ title: String) -> some View {
+        Text(title).scaledFont(.callout).foregroundStyle(.secondary).gridColumnAlignment(.leading)
+    }
+
+    /// Allergens the person avoids come first, in orange with a warning sign.
+    private var allergenText: some View {
+        let flagged = item.allergens.filter { label in avoided.contains { $0.matches(label) } }
+        let others = item.allergens.filter { !flagged.contains($0) }
+        let warning = flagged.isEmpty ? Text("") : Text("\(Image(systemName: "exclamationmark.triangle.fill")) \(flagged.joined(separator: ", "))")
+            .foregroundStyle(.orange).fontWeight(.semibold)
+        let rest = Text((flagged.isEmpty || others.isEmpty ? "" : ", ") + others.joined(separator: ", "))
+        return Text("\(warning)\(rest)").scaledFont(.callout)
+            .accessibilityLabel(flagged.isEmpty
+                ? "Allergens: " + item.allergens.joined(separator: ", ")
+                : "Contains allergens you avoid: \(flagged.joined(separator: ", ")). Other allergens: \(others.isEmpty ? "none" : others.joined(separator: ", "))")
+    }
+
+    private var nutritionLabel: some View {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 3) {
+            ForEach(item.nutrition) { nutrient in
+                GridRow {
+                    Text(nutrient.name)
+                        .padding(.leading, nutrient.isSubRow ? 12 : 0)
+                        .foregroundStyle(nutrient.isSubRow ? .secondary : .primary)
+                    Text(nutrient.formattedAmount)
+                        .monospacedDigit()
+                        .gridColumnAlignment(.trailing)
+                }
+                .accessibilityElement(children: .combine)
+            }
         }
-        .accessibilityElement(children: .combine)
+        .scaledFont(.callout)
+        .padding(.top, 4)
+    }
+}
+
+/// A plain disclosure row whose content height is part of the panel's natural height.
+private struct Disclosure<Content: View>: View {
+    let title: String
+    @Binding var isOpen: Bool
+    @ViewBuilder let content: () -> Content
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                if reduceMotion { isOpen.toggle() } else { withAnimation(.snappy(duration: 0.2)) { isOpen.toggle() } }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    Text(title)
+                }
+                .scaledFont(.subheadline, weight: .medium)
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
+            if isOpen { content().transition(.opacity) }
+        }
     }
 }

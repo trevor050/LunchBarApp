@@ -2,7 +2,7 @@ import AppKit
 import LunchKit
 import SwiftUI
 
-/// Renders the real popover (with live data) to PNG files without showing any UI.
+/// Renders the real menu window content (with live data) to PNG files without showing any UI.
 ///
 ///     LunchBar --render-snapshots <out-dir> <district> <school-slug> <menu-type> <yyyy-mm-dd> [options]
 ///
@@ -17,6 +17,9 @@ import SwiftUI
 ///   --filter TEXT    filter the full menu by item name
 ///   --loading        delay report transport to render the actual pending state
 ///   --matrix         verify hall/meal/day switching and cached reopens
+///   --text-size S    large or extraLarge (the app's Text Size setting)
+///   --high-contrast  render with the increased-contrast appearances
+///   --full           render the whole content instead of stopping at the window's maximum height
 ///
 /// Used to produce README images and to check every state in light and dark mode.
 @MainActor
@@ -62,19 +65,22 @@ enum SnapshotRenderer {
         }
         if arguments.contains("--protein-lean") { settings.proteinRanking = .per100Calories }
         if arguments.contains("--avoid-milk") { settings.avoidedAllergens = [.milk] }
+        if let index = arguments.firstIndex(of: "--text-size"), arguments.indices.contains(index + 1),
+           let size = TextSize(rawValue: arguments[index + 1]) { settings.textSize = size }
+        let contrast = arguments.contains("--high-contrast")
 
         let noon = day.date().map { $0.addingTimeInterval(12 * 3600) } ?? Date()
         let repository = MenuRepository(client: client, cache: MenuCache(directory: nil), foodPro: RutgersFoodPro(loader: network, directory: nil))
         let model = MenuViewModel(settings: settings, repository: repository, now: { noon })
         let settle = { spin(until: { model.phase != .loading && !model.isRefreshing && (arguments.contains("--loading") || !model.nutritionLoading) }, timeout: 60) }
         if arguments.contains("--offline-cold") { network.isOffline = true }
-        model.popoverWillOpen()
+        model.panelWillOpen()
         settle()
         if arguments.contains("--matrix") {
             verifyMatrix(model: model, network: network, client: client, output: output, date: day, settle: settle)
         }
         let coldRequests = network.requestCount
-        model.popoverWillOpen()
+        model.panelWillOpen()
         settle()
         print("requests cold=\(coldRequests) warm=\(network.requestCount - coldRequests)")
         if let notice = model.nutritionNotice { print("nutritionNotice=\(notice)") }
@@ -106,12 +112,10 @@ enum SnapshotRenderer {
             settle()
         }
 
-        let popover = PopoverView(model: model, openSettings: {}, quit: {})
-            .background(Color(nsColor: .windowBackgroundColor))
         var name = "\(district)-\(schoolSlug)-\(menuSlug)-\(model.day.isoString)"
         if network.isOffline { name += "-offline" }
-        render(popover, size: PopoverView.size, appearance: .aqua, to: output.appending(path: "\(name)-light.png"), fitContent: true)
-        render(popover, size: PopoverView.size, appearance: .darkAqua, to: output.appending(path: "\(name)-dark.png"), fitContent: true)
+        renderPanel(model: model, appearance: contrast ? .accessibilityHighContrastAqua : .aqua, to: output.appending(path: "\(name)-light.png"))
+        renderPanel(model: model, appearance: contrast ? .accessibilityHighContrastDarkAqua : .darkAqua, to: output.appending(path: "\(name)-dark.png"))
 
         if arguments.contains("--settings") {
             let finder = SchoolFinder(client: client)
@@ -157,15 +161,14 @@ enum SnapshotRenderer {
                         continue
                     }
                     let before = network.requestCount
-                    model.popoverWillOpen(); model.go(to: selectedDate); settle()
+                    model.panelWillOpen(); model.go(to: selectedDate); settle()
                     let warm = network.requestCount - before
                     let top = model.topProteinItems.map { ["name": $0.name, "protein": $0.protein ?? 0, "calories": $0.calories ?? 0, "recipe": $0.foodID, "station": $0.category ?? ""] as [String: Any] }
                     records.append(["hall": hall.name, "meal": meal.name, "date": selectedDate.isoString,
                                     "items": menu.items.count, "stations": menu.sections.count, "warmRequests": warm, "top": top,
                                     "nutritionNotice": model.nutritionNotice ?? ""])
-                    let view = PopoverView(model: model, openSettings: {}, quit: {}).background(Color(nsColor: .windowBackgroundColor))
-                    render(view, size: PopoverView.size, appearance: .darkAqua,
-                           to: output.appending(path: "matrix-\(hall.slug)-\(meal.slug)-\(selectedDate.isoString).png"), fitContent: true)
+                    renderPanel(model: model, appearance: .darkAqua,
+                                to: output.appending(path: "matrix-\(hall.slug)-\(meal.slug)-\(selectedDate.isoString).png"))
                 }
             }
         }
@@ -177,14 +180,33 @@ enum SnapshotRenderer {
             model.go(to: date); settle()
             if case .menu(let menu) = model.phase {
                 records.append(["hall": school.name, "date": date.isoString, "items": menu.items.count, "topCount": model.topProteinItems.count])
-                let view = PopoverView(model: model, openSettings: {}, quit: {}).background(Color(nsColor: .windowBackgroundColor))
-                render(view, size: PopoverView.size, appearance: .aqua, to: output.appending(path: "matrix-middlesex.png"), fitContent: true)
+                renderPanel(model: model, appearance: .aqua, to: output.appending(path: "matrix-middlesex.png"))
             } else { failures += 1 }
         } else { failures += 1 }
         let report: [String: Any] = ["records": records, "failures": failures, "requests": network.requestCount, "savedPlaces": model.settings.savedPlaces.map(\.placeKey)]
         if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: output.appending(path: "live-matrix.json")) }
         print("matrix failures=\(failures), requests=\(network.requestCount), savedPlaces=\(model.settings.savedPlaces.count)")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    /// The panel at the height the app would give it, with its rounded edge.
+    /// Vibrancy cannot be captured offscreen, so the window background stands in.
+    private static func renderPanel(model: MenuViewModel, appearance: NSAppearance.Name, to url: URL) {
+        // Let thumbnails arrive before measuring, as they would in the open window.
+        _ = PanelMeasure.naturalHeight(model: model, appearance: appearance)
+        spin(until: { false }, timeout: 3)
+        let natural = PanelMeasure.naturalHeight(model: model, appearance: appearance)
+        let full = CommandLine.arguments.contains("--full")
+        let height = full ? natural : PanelGeometry.height(natural: natural, top: 4000, visible: NSRect(x: 0, y: 0, width: 4000, height: 4000))
+        print("panel natural=\(natural) height=\(height)")
+        let shape = RoundedRectangle(cornerRadius: PanelGeometry.cornerRadius, style: .continuous)
+        let view = PanelView(model: model, openSettings: {}, quit: {}, measuring: full)
+            .frame(height: height)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Color.primary.opacity(appearance.rawValue.contains("HighContrast") ? 0.5 : 0.14), lineWidth: 1))
+            .padding(10)
+        render(view, size: CGSize(width: PanelGeometry.width + 20, height: height + 20), appearance: appearance, to: url)
     }
 
     private static func render(_ view: some View, size: CGSize, appearance: NSAppearance.Name, to url: URL, fitContent: Bool = false) {

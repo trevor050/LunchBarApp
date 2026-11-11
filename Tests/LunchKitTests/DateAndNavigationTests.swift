@@ -61,7 +61,7 @@ struct DateAndNavigationTests {
         #expect(nav.step(from: friday, by: 0) == friday)
     }
 
-    @Test("The popover opens on Monday during a weekend")
+    @Test("The menu opens on Monday during a weekend")
     func initialDay() {
         #expect(DayNavigator(skipWeekends: true).initialDay(today: saturday) == monday)
         #expect(DayNavigator(skipWeekends: true).initialDay(today: sunday) == monday)

@@ -2,7 +2,7 @@ import Foundation
 import LunchKit
 import Observation
 
-/// Drives the popover: which day is shown, and what state that day is in.
+/// Drives the menu window: which day is shown, and what state that day is in.
 @MainActor
 @Observable
 final class MenuViewModel {
@@ -20,7 +20,14 @@ final class MenuViewModel {
         case notPosted(notes: [String])
     }
 
-    private(set) var phase: Phase = .loading
+    private(set) var phase: Phase = .loading {
+        didSet { if phase != .loading { contentRevision += 1 } }
+    }
+    /// Counts arrivals of new content (not entries into loading), for the self-test.
+    @ObservationIgnored private(set) var contentRevision = 0
+    /// Height of the last content shown, so a loading state can keep the window's
+    /// size instead of shrinking to a spinner and growing back.
+    @ObservationIgnored var lastContentHeight: CGFloat = 0
     private(set) var day: LocalDate
     private(set) var today: LocalDate
     /// Set when showing a saved copy because the refresh failed.
@@ -64,9 +71,9 @@ final class MenuViewModel {
 
     // MARK: Actions
 
-    /// Called every time the popover opens. Jumps back to today after midnight or
+    /// Called every time the menu window opens. Jumps back to today after midnight or
     /// after a long sleep, then refreshes if the cached copy is old.
-    func popoverWillOpen() {
+    func panelWillOpen() {
         today = LocalDate(now())
         if lastOpenedToday != today {
             lastOpenedToday = today
@@ -124,6 +131,15 @@ final class MenuViewModel {
             for i in day.sections.indices { day.sections[i].items.removeAll { !verifiedRecipes.contains($0.foodID) } }
         }
         return settings.proteinRanking.top(in: day, avoiding: settings.avoidedAllergens)
+    }
+
+    /// Whether the "Top protein" group earns its space: only when enough items have
+    /// protein data that a short list of the best ones is a real shortcut. While
+    /// FoodPro nutrition is still loading for a large menu, keep its place.
+    var showsTopProtein: Bool {
+        guard case .menu(let day) = phase else { return false }
+        if nutritionLoading && source?.provider == .rutgersFoodPro && day.items.count >= 10 { return true }
+        return settings.proteinRanking.showsGroup(in: day, avoiding: settings.avoidedAllergens)
     }
 
     func sourceDidChange() {

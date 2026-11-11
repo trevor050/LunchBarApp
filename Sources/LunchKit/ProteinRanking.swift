@@ -26,6 +26,17 @@ public enum ProteinRanking: String, CaseIterable, Codable, Sendable {
         }.filter { seen.insert($0.foodID.isEmpty ? $0.id : $0.foodID).inserted }.prefix(max(0, limit)).map { $0 }
     }
 
+    /// Fewest rankable items for which a separate "Top protein" group adds anything.
+    public static let minimumRankedForGroup = 8
+
+    /// Whether a group of the top `limit` items is worth showing above the menu.
+    /// It is not when few items have protein data, or when the group would hold
+    /// most of the menu (a two-item lunch would simply be listed twice).
+    public func showsGroup(in day: MenuDay, avoiding allergens: Set<Allergen>, limit: Int = 5) -> Bool {
+        let ranked = top(in: day, avoiding: allergens, limit: Int.max).count
+        return ranked >= max(Self.minimumRankedForGroup, limit + 1) && day.items.count >= limit * 2
+    }
+
     /// Only <=2 oz portions at explicitly ingredient/build-your-own stations.
     /// EACH/SLICE portions, larger portions and ordinary entree stations stay eligible.
     /// This is a ranking rule only; it never removes anything from the full menu.

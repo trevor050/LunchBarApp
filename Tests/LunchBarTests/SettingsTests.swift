@@ -49,7 +49,7 @@ struct FoodProViewModelTests {
         let repository = MenuRepository(client: NutrisliceClient(loader: loader), cache: MenuCache(directory: nil), foodPro: provider)
         let date = LocalDate(iso: "2026-11-10")!
         let model = MenuViewModel(settings: settings, repository: repository, now: { date.date()!.addingTimeInterval(3600 * 12) })
-        model.popoverWillOpen()
+        model.panelWillOpen()
         #expect(model.isRefreshing)
         #expect(model.topProteinItems.isEmpty)
         for _ in 0..<400 {
@@ -63,7 +63,7 @@ struct FoodProViewModelTests {
         #expect(day.items.count == 3)
         let cold = await loader.count
         #expect(cold == 5) // menu, report, three labels, including the excluded candidate
-        model.popoverWillOpen()
+        model.panelWillOpen()
         for _ in 0..<400 {
             if !model.isRefreshing && !model.nutritionLoading { break }
             try await Task.sleep(for: .milliseconds(10))

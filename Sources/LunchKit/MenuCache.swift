@@ -2,13 +2,22 @@ import Foundation
 
 /// A week plus when it was downloaded.
 public struct CachedWeek: Codable, Hashable, Sendable {
+    /// Bump when parsed menus change shape or presentation (2: Rutgers names in
+    /// normal case). Older disk copies are treated as missing and refetched.
+    public static let currentFormat = 2
+
     public var week: MenuWeek
     public var fetchedAt: Date
+    /// Absent in files written before versioning, which reads as format 1.
+    public var format: Int?
 
-    public init(week: MenuWeek, fetchedAt: Date) {
+    public init(week: MenuWeek, fetchedAt: Date, format: Int? = CachedWeek.currentFormat) {
         self.week = week
         self.fetchedAt = fetchedAt
+        self.format = format
     }
+
+    public var isCurrentFormat: Bool { (format ?? 1) == Self.currentFormat }
 
     public func isFresh(now: Date, maxAge: TimeInterval) -> Bool {
         now.timeIntervalSince(fetchedAt) < maxAge && now >= fetchedAt
@@ -47,7 +56,8 @@ public actor MenuCache {
         if let hit = memory[key] { return hit }
         guard let url = fileURL(for: key),
               let data = try? Data(contentsOf: url),
-              let cached = try? decoder.decode(CachedWeek.self, from: data) else {
+              let cached = try? decoder.decode(CachedWeek.self, from: data),
+              cached.isCurrentFormat else {
             return nil
         }
         memory[key] = cached
@@ -74,7 +84,8 @@ public actor MenuCache {
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         for file in files where file.pathExtension == "json" {
             guard let data = try? Data(contentsOf: file),
-                  let cached = try? decoder.decode(CachedWeek.self, from: data) else {
+                  let cached = try? decoder.decode(CachedWeek.self, from: data),
+                  cached.isCurrentFormat else {
                 try? FileManager.default.removeItem(at: file)
                 continue
             }

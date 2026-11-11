@@ -137,6 +137,20 @@ struct CacheTests {
         #expect(await cache.week(for: key) == nil)
     }
 
+    @Test("Weeks written by an older format are refetched, not shown")
+    func olderFormatIsIgnored() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "LunchKitTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let week = try MenuParser.week(from: Fixture.data(Fixture.middlesexWeek))
+        let key = MenuCache.key(source: .middlesexLunch, weekStart: week.start)
+        await MenuCache(directory: directory).store(CachedWeek(week: week, fetchedAt: Date(), format: nil), for: key)
+        #expect(await MenuCache(directory: directory).week(for: key) == nil)
+        let pruned = MenuCache(directory: directory)
+        await pruned.prune(olderThan: week.start.adding(days: -30))
+        let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(files.isEmpty)
+    }
+
     @Test("Concurrent requests for one week share a single download")
     func coalescing() async throws {
         let data = try Fixture.data(Fixture.middlesexWeek)
