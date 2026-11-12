@@ -1,0 +1,22 @@
+{
+  "hall": "Busch Dining Hall",
+  "meal": "Lunch",
+  "date": "2026-11-10",
+  "items": 141,
+  "coldRequests": 3,
+  "warmRequests": 0,
+  "cache": "isolated, initially empty app menu and recipe caches",
+  "scope": "FoodPro menu and nutrition HTTP calls; no finder calls or label expansions",
+  "coldBreakdown": {
+    "menuGET": 1,
+    "nutritionReportPOST": 2
+  },
+  "userAgent": "LunchBar/2.0 (+https://github.com/trevor050/LunchBarApp)",
+  "allergenExample": {
+    "date": "2026-11-11",
+    "avoided": "Milk",
+    "coldRequests": 12,
+    "warmRequests": 0,
+    "scope": "menu and ranking; excludes later manual detail expansion"
+  }
+}

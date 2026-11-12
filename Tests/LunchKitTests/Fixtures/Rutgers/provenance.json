@@ -1,0 +1,59 @@
+{
+  "recorded": "2026-11-10 America/New_York",
+  "requests": [
+    {
+      "file": "03-lunch-2026-11-10.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=03&locationName=Livingston+Dining+Commons&dtdate=11%2F10%2F2026&activeMeal=Lunch&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "03-dinner-2026-11-10.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=03&locationName=Livingston+Dining+Commons&dtdate=11%2F10%2F2026&activeMeal=Dinner&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "04-lunch-2026-11-10.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&activeMeal=Lunch&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "04-dinner-2026-11-10.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&activeMeal=Dinner&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "05-lunch-2026-11-10.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=05&locationName=Neilson+Dining+Hall&dtdate=11%2F10%2F2026&activeMeal=Lunch&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "05-dinner-2026-11-10.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=05&locationName=Neilson+Dining+Hall&dtdate=11%2F10%2F2026&activeMeal=Dinner&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "04-empty-2026-11-26.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/pickmenu.aspx?sName=Rutgers+University+Dining&locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F26%2F2026&activeMeal=Lunch&naFlag=1",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "04-label-eggs.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/label.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&RecNumAndPort=061002%2A4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "file": "04-lunch-report.html",
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/nutRpt.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&mealName=Lunch&sName=Rutgers+University+Dining",
+      "method": "POST",
+      "status": 200
+    }
+  ]
+}

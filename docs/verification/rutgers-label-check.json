@@ -1,0 +1,57 @@
+{
+  "hall": "Busch Dining Hall",
+  "meal": "Lunch",
+  "date": "2026-11-10",
+  "checks": [
+    {
+      "item": "BBQ PORK SANDWICH",
+      "recipe": "250008*4",
+      "reportProtein": 46.802,
+      "labelProtein": 46.8,
+      "reportCalories": 738,
+      "labelCalories": 738,
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/label.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&RecNumAndPort=250008%2A4",
+      "agrees": true
+    },
+    {
+      "item": "GRILLED CHICKEN CAESAR SALAD",
+      "recipe": "600925*1",
+      "reportProtein": 44.275,
+      "labelProtein": 44.3,
+      "reportCalories": 460,
+      "labelCalories": 460,
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/label.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&RecNumAndPort=600925%2A1",
+      "agrees": true
+    },
+    {
+      "item": "TURKEY & PROVOLONE ON KAISER",
+      "recipe": "600903*1",
+      "reportProtein": 42.767,
+      "labelProtein": 42.8,
+      "reportCalories": 419,
+      "labelCalories": 419,
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/label.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&RecNumAndPort=600903%2A1",
+      "agrees": true
+    },
+    {
+      "item": "CHICKEN CAESAR WRAP",
+      "recipe": "600929*1",
+      "reportProtein": 40.307,
+      "labelProtein": 40.3,
+      "reportCalories": 774,
+      "labelCalories": 774,
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/label.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&RecNumAndPort=600929%2A1",
+      "agrees": true
+    },
+    {
+      "item": "SPICY CHICKEN FLATBREAD SANDWICH",
+      "recipe": "705228*1",
+      "reportProtein": 35.158,
+      "labelProtein": 35.2,
+      "reportCalories": 681,
+      "labelCalories": 681,
+      "url": "https://menuportal23.dining.rutgers.edu/foodpronet/label.aspx?locationNum=04&locationName=Busch+Dining+Hall&dtdate=11%2F10%2F2026&RecNumAndPort=705228%2A1",
+      "agrees": true
+    }
+  ]
+}
